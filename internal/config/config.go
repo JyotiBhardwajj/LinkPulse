@@ -39,8 +39,11 @@ type CacheConfig struct {
 
 // JWTConfig stores authentication secret keys and expiration values.
 type JWTConfig struct {
-	Secret     string        `mapstructure:"JWT_SECRET"`
-	Expiration time.Duration `mapstructure:"JWT_EXPIRATION"`
+	Secret           string        `mapstructure:"JWT_SECRET"`
+	AccessTokenTTL   time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
+	RefreshTokenTTL  time.Duration `mapstructure:"REFRESH_TOKEN_TTL"`
+	Issuer           string        `mapstructure:"TOKEN_ISSUER"`
+	MaxLoginAttempts int           `mapstructure:"MAX_LOGIN_ATTEMPTS"`
 }
 
 // Config is the top-level configuration container for LinkPulse.
@@ -75,7 +78,11 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("REDIS_HOST", "localhost")
 	viper.SetDefault("REDIS_PORT", "6379")
 	viper.SetDefault("CACHE_TTL", "24h")
-	viper.SetDefault("JWT_EXPIRATION", "72h")
+	viper.SetDefault("JWT_SECRET", "supersecretjwtkeythatisreallylongandsecure")
+	viper.SetDefault("ACCESS_TOKEN_TTL", "15m")
+	viper.SetDefault("REFRESH_TOKEN_TTL", "7d")
+	viper.SetDefault("TOKEN_ISSUER", "linkpulse-api")
+	viper.SetDefault("MAX_LOGIN_ATTEMPTS", 5)
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("BUILD_VERSION", "1.0.0")
 	viper.SetDefault("GIT_COMMIT", "unknown")
