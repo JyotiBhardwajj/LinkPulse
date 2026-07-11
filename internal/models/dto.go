@@ -45,12 +45,19 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ShortenLinkRequest represents the payload required to shorten a link.
-type ShortenLinkRequest struct {
+// CreateLinkRequest represents the payload required to shorten a link.
+type CreateLinkRequest struct {
 	OriginalURL string     `json:"original_url" binding:"required,url"`
 	Title       string     `json:"title,omitempty" binding:"omitempty,max=255"`
+	CustomAlias string     `json:"custom_alias,omitempty" binding:"omitempty,min=3,max=50"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	CustomSlug  string     `json:"custom_slug,omitempty" binding:"omitempty,alphanum,min=3,max=50"`
+}
+
+// UpdateLinkRequest represents the payload to modify an existing link's settings.
+type UpdateLinkRequest struct {
+	Title     *string    `json:"title,omitempty" binding:"omitempty,max=255"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	IsActive  *bool      `json:"is_active,omitempty"`
 }
 
 // LinkResponse represents the response containing shortened link details.
@@ -61,7 +68,29 @@ type LinkResponse struct {
 	ShortURL    string     `json:"short_url"`
 	Title       string     `json:"title,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	IsActive    bool       `json:"is_active"`
+	ClickCount  int64      `json:"click_count"`
 	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// ListLinksQuery defines filter search sorting and paging variables.
+type ListLinksQuery struct {
+	Page   int    `form:"page,default=1"`
+	Limit  int    `form:"limit,default=20"`
+	Search string `form:"search"`
+	Sort   string `form:"sort,default=created_at"`
+	Order  string `form:"order,default=desc"`
+	Status string `form:"status"` // active, expired, inactive, deleted
+}
+
+// PaginationResponse represents a generic paginated output envelope.
+type PaginationResponse[T any] struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int   `json:"total_pages"`
+	Items      []T   `json:"items"`
 }
 
 // ClickDetails captures user-agent and geo-IP information for analytics extraction.

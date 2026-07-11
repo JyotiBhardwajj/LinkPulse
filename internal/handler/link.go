@@ -3,16 +3,17 @@ package handler
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"time"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/service"
 	"linkpulse/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // LinkHandler controllers HTTP operations on links.
@@ -25,41 +26,38 @@ func NewLinkHandler(linkService service.LinkService) *LinkHandler {
 	return &LinkHandler{linkService: linkService}
 }
 
-// Shorten binds the request body and invokes the service to generate a shortened URL.
-func (h *LinkHandler) Shorten(c *gin.Context) {
-	var req models.ShortenLinkRequest
+// Create binds request payload and creates a shortened mapping.
+func (h *LinkHandler) Create(c *gin.Context) {
+	var req models.CreateLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
 		return
 	}
 
-	// For Day 1, auth is placeholder so we create guest links (nil user ID)
-	resp, err := h.linkService.Shorten(c.Request.Context(), req, nil)
-	if err != nil {
-		status := domainErrors.MapToHTTPStatus(err)
-		utils.SendError(c, status, err.Error(), "SHORTEN_FAILED")
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
 		return
 	}
 
-	// Construct the absolute shortened URL
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
+	resp, err := h.linkService.Create(c.Request.Context(), req, &authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_CREATION_FAILED")
+		return
 	}
-	resp.ShortURL = scheme + "://" + c.Request.Host + "/r/" + resp.ShortCode
 
 	utils.SendSuccess(c, http.StatusCreated, "Link shortened successfully", resp)
 }
 
-// Resolve looks up the short code and redirects the client, writing click analytics asynchronously.
+// Resolve processes short code lookup and issues 302 HTTP redirection.
 func (h *LinkHandler) Resolve(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
-		utils.SendError(c, http.StatusBadRequest, "short code is required", "MISSING_SHORT_CODE")
+		utils.SendError(c, http.StatusBadRequest, "short code parameter is required", "MISSING_SHORT_CODE")
 		return
 	}
 
-	// Resolve the original URL (cache-first check)
 	originalURL, err := h.linkService.Resolve(c.Request.Context(), code)
 	if err != nil {
 		status := domainErrors.MapToHTTPStatus(err)
@@ -67,40 +65,139 @@ func (h *LinkHandler) Resolve(c *gin.Context) {
 		return
 	}
 
-	// Extract click details for analytics
-	userAgent := c.Request.UserAgent()
-	referrer := c.GetHeader("Referer")
+	// HTTP redirect (302 Found) executed strictly inside HTTP handler layer
+	c.Redirect(http.StatusFound, originalURL)
+
+	// Asynchronous metrics analytics logging stub
 	clientIP := c.ClientIP()
 	ipHash := utils.HashIP(clientIP)
+	userAgent := c.Request.UserAgent()
+	referrer := c.GetHeader("Referer")
 
 	clickDetails := models.ClickDetails{
 		IPHash:    ipHash,
 		UserAgent: userAgent,
 		Referrer:  referrer,
-		// Analytics parsing placeholders (real parsing would use useragent/geoip libs)
-		Country: "Unknown",
-		City:    "Unknown",
-		Browser: "Unknown",
-		OS:      "Unknown",
-		Device:  "Unknown",
+		Country:   "Unknown",
+		City:      "Unknown",
+		Browser:   "Unknown",
+		OS:        "Unknown",
+		Device:    "Unknown",
 	}
 
-	// Redirect client immediately to minimize latency
-	c.Redirect(http.StatusFound, originalURL)
-
-	// Fire-and-forget click analytics tracking to keep redirect fast and enable future asynchronous scale
 	go func(shortCode string, details models.ClickDetails) {
-		// Use background context as the original request context will be cancelled after redirect response completes
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-
-		if err := h.linkService.RecordClick(ctx, shortCode, details); err != nil {
-			slog.Error("Asynchronous click tracking failed", "code", shortCode, "error", err)
-		}
+		_ = h.linkService.RecordClick(ctx, shortCode, details)
 	}(code, clickDetails)
 }
 
-// GetStats returns usage statistics for a specific shortened link.
+// Get retrieves details of a specific link owned by the user.
+func (h *LinkHandler) Get(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		return
+	}
+
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.linkService.GetByID(c.Request.Context(), id, authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_NOT_FOUND")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Link retrieved successfully", resp)
+}
+
+// List returns all links registered by the authenticated user.
+func (h *LinkHandler) List(c *gin.Context) {
+	var q models.ListLinksQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_QUERY_PARAMS")
+		return
+	}
+
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.linkService.List(c.Request.Context(), authCtx.UserID, q)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_LIST_FAILED")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Links retrieved successfully", resp)
+}
+
+// Update partial-modifies link configurations.
+func (h *LinkHandler) Update(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		return
+	}
+
+	var req models.UpdateLinkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		return
+	}
+
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.linkService.Update(c.Request.Context(), id, authCtx.UserID, req)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_UPDATE_FAILED")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Link updated successfully", resp)
+}
+
+// Delete soft-removes the resource mapping.
+func (h *LinkHandler) Delete(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		return
+	}
+
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
+		return
+	}
+
+	err = h.linkService.Delete(c.Request.Context(), id, authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_DELETE_FAILED")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// GetStats returns click analytics counts for a specific shortened link.
 func (h *LinkHandler) GetStats(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
@@ -108,8 +205,18 @@ func (h *LinkHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	// For Day 1, since authentication is placeholder, we use a zero UUID as stub or return unauthorized
-	// Once JWT middleware is active, we would read the user ID from the context.
-	status := domainErrors.MapToHTTPStatus(domainErrors.ErrUnauthorized)
-	utils.SendError(c, status, "Authentication required to view link stats", "UNAUTHORIZED")
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "user authentication context required", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.linkService.GetStats(c.Request.Context(), code, authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LINK_STATS_FAILED")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Link statistics retrieved successfully", resp)
 }

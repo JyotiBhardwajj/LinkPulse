@@ -64,7 +64,7 @@ func NewApplication() (*Application, error) {
 
 	// 7. Initialize Services
 	userService := service.NewUserService(repoMgr.Users())
-	linkService := service.NewLinkService(repoMgr.Links(), repoMgr.Analytics(), linkCache, cfg.Server.ShortCodeLength, cfg.Server.MaxGenerationRetries)
+	linkService := service.NewLinkService(repoMgr.Links(), repoMgr.Analytics(), linkCache, cfg.Server.ShortCodeLength, cfg.Server.MaxGenerationRetries, cfg.Server.BaseURL)
 	authService := service.NewAuthService(repoMgr.Users(), repoMgr.RefreshTokens(), cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL, cfg.JWT.Issuer)
 
 	// 8. Initialize Handlers

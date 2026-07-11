@@ -174,11 +174,64 @@ curl -X GET http://localhost:8080/health
 }
 ```
 
-### Shorten a URL
+### Authentication & Session Management
+
+#### Register a New User
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+```
+
+#### User Login (Obtain Tokens)
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+```
+**Response (`200 OK`)**:
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1Ni...",
+    "refresh_token": "9a38fcd8e...",
+    "expires_in": 900
+  }
+}
+```
+
+#### Rotate Session (Refresh Token Rotation)
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "9a38fcd8e..."}'
+```
+
+#### User Logout
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "9a38fcd8e..."}'
+```
+
+---
+
+### Link Management (Authenticated)
+
+#### Create a Shortened Link
 ```bash
 curl -X POST http://localhost:8080/api/v1/links \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"original_url": "https://news.ycombinator.com", "title": "Hacker News"}'
+  -d '{
+    "original_url": "https://news.ycombinator.com",
+    "title": "Hacker News",
+    "custom_alias": "hn-home",
+    "expires_at": "2026-12-31T23:59:59Z"
+  }'
 ```
 **Response (`201 Created`)**:
 ```json
@@ -188,13 +241,95 @@ curl -X POST http://localhost:8080/api/v1/links \
   "data": {
     "id": "2db42907-9b2f-4886-bb21-2e6fb082161f",
     "original_url": "https://news.ycombinator.com",
-    "short_code": "xR82d1K",
-    "short_url": "http://localhost:8080/r/xR82d1K",
+    "short_code": "hn-home",
+    "short_url": "http://localhost:8080/r/hn-home",
     "title": "Hacker News",
-    "created_at": "2026-07-11T13:31:00Z"
+    "expires_at": "2026-12-31T23:59:59Z",
+    "is_active": true,
+    "click_count": 0,
+    "created_at": "2026-07-11T13:31:00Z",
+    "updated_at": "2026-07-11T13:31:00Z"
   }
 }
 ```
+
+#### List My Links (Paginated, Search & Sorted)
+- **Query parameters**:
+  - `page` (default: 1)
+  - `limit` (default: 20, max: 100)
+  - `search` (optional search keyword)
+  - `sort` (whitelist: `created_at`, `updated_at`, `expires_at`)
+  - `order` (`asc`, `desc`)
+  - `status` (`active`, `expired`, `inactive`, `deleted`)
+```bash
+curl -X GET "http://localhost:8080/api/v1/links?page=1&limit=2&search=Hacker&sort=created_at&order=desc" \
+  -H "Authorization: Bearer <access_token>"
+```
+**Response (`200 OK`)**:
+```json
+{
+  "success": true,
+  "message": "Links retrieved successfully",
+  "data": {
+    "page": 1,
+    "limit": 2,
+    "total": 1,
+    "total_pages": 1,
+    "items": [
+      {
+        "id": "2db42907-9b2f-4886-bb21-2e6fb082161f",
+        "original_url": "https://news.ycombinator.com",
+        "short_code": "hn-home",
+        "short_url": "http://localhost:8080/r/hn-home",
+        "title": "Hacker News",
+        "expires_at": "2026-12-31T23:59:59Z",
+        "is_active": true,
+        "click_count": 0,
+        "created_at": "2026-07-11T13:31:00Z",
+        "updated_at": "2026-07-11T13:31:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### Get Link Details
+```bash
+curl -X GET http://localhost:8080/api/v1/links/2db42907-9b2f-4886-bb21-2e6fb082161f \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### Update Link (PATCH)
+```bash
+curl -X PATCH http://localhost:8080/api/v1/links/2db42907-9b2f-4886-bb21-2e6fb082161f \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Updated Hacker News Title", "is_active": false}'
+```
+
+#### Delete Link (Soft Delete)
+```bash
+curl -X DELETE http://localhost:8080/api/v1/links/2db42907-9b2f-4886-bb21-2e6fb082161f \
+  -H "Authorization: Bearer <access_token>"
+```
+**Response (`204 No Content`)**
+
+---
+
+### Redirection (Public)
+
+#### Resolve Shortened URL
+```bash
+curl -i -X GET http://localhost:8080/r/hn-home
+```
+**Response (`302 Found` with Location redirection header)**:
+```text
+HTTP/1.1 302 Found
+Location: https://news.ycombinator.com
+```
+*Edge cases*:
+- Expired links return `410 Gone`.
+- Deactivated or soft-deleted links return `404 Not Found`.
 
 ---
 

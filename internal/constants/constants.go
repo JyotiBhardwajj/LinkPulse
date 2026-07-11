@@ -17,3 +17,9 @@ const (
 	// DefaultShortCodeLength is the fallback length for slug generation.
 	DefaultShortCodeLength = 7
 )
+
+// ReservedAliases contains list of slug keywords that cannot be registered by users.
+var ReservedAliases = []string{
+	"api", "auth", "login", "logout", "register",
+	"swagger", "health", "metrics", "admin", "users", "links",
+}
