@@ -1,0 +1,44 @@
+# Binaries and executables
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment variables (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# Dependency directories
+vendor/
+
+# Go coverage and profiling
+*.coverprofile
+coverage.txt
+coverage.out
+cpu.out
+mem.out
+
+# IDE and Editor configs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
