@@ -8,9 +8,34 @@ import (
 )
 
 // UserRegisterRequest represents the request body for user registration.
+// Note: password maximum length is set to 72 characters because bcrypt ignores any bytes past 72.
 type UserRegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
+}
+
+// LoginRequest represents credentials supplied for authentication checks.
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+// TokenResponse represents standard OAuth2-like JWT output payload.
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"` // Access token TTL in seconds
+}
+
+// RefreshRequest is the payload required to rotate user sessions.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// SessionResponse represents checks returned to determine authentication states.
+type SessionResponse struct {
+	Authenticated bool         `json:"authenticated"`
+	User          UserResponse `json:"user"`
 }
 
 // UserResponse represents the public user response.

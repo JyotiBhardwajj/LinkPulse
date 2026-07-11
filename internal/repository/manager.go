@@ -10,12 +10,14 @@ type RepositoryManager interface {
 	Users() UserRepository
 	Links() LinkRepository
 	Analytics() AnalyticsRepository
+	RefreshTokens() RefreshTokenRepository
 }
 
 type repositoryManager struct {
 	userRepo      UserRepository
 	linkRepo      LinkRepository
 	analyticsRepo AnalyticsRepository
+	refreshRepo   RefreshTokenRepository
 }
 
 // NewRepositoryManager creates a unified RepositoryManager.
@@ -24,6 +26,7 @@ func NewRepositoryManager(db *gorm.DB) RepositoryManager {
 		userRepo:      NewUserRepository(db),
 		linkRepo:      NewLinkRepository(db),
 		analyticsRepo: NewAnalyticsRepository(db),
+		refreshRepo:   NewRefreshTokenRepository(db),
 	}
 }
 
@@ -41,3 +44,9 @@ func (m *repositoryManager) Links() LinkRepository {
 func (m *repositoryManager) Analytics() AnalyticsRepository {
 	return m.analyticsRepo
 }
+
+// RefreshTokens returns the RefreshTokenRepository implementation.
+func (m *repositoryManager) RefreshTokens() RefreshTokenRepository {
+	return m.refreshRepo
+}
+

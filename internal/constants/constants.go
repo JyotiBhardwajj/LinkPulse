@@ -11,6 +11,9 @@ const (
 	// UserIDKey is the context key where authenticated user IDs are stored.
 	UserIDKey ContextKey = "UserID"
 
+	// AuthContextKey is the context key where the AuthContext struct is stored.
+	AuthContextKey ContextKey = "AuthContext"
+
 	// DefaultShortCodeLength is the fallback length for slug generation.
 	DefaultShortCodeLength = 7
 )
