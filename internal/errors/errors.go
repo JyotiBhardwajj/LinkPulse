@@ -19,6 +19,9 @@ var (
 	// ErrUnauthorized is returned when credentials are invalid or missing.
 	ErrUnauthorized = errors.New("unauthorized access")
 
+	// ErrInvalidCredentials is returned on login failures to prevent user enumeration.
+	ErrInvalidCredentials = errors.New("Invalid email or password.")
+
 	// ErrInternal is returned when an unexpected system error occurs.
 	ErrInternal = errors.New("internal server error")
 )
@@ -36,7 +39,7 @@ func MapToHTTPStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, ErrInvalidInput):
 		return http.StatusBadRequest
-	case errors.Is(err, ErrUnauthorized):
+	case errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrInvalidCredentials):
 		return http.StatusUnauthorized
 	default:
 		return http.StatusInternalServerError

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/service"
 	"linkpulse/internal/utils"
@@ -38,4 +39,22 @@ func (h *UserHandler) Register(c *gin.Context) {
 	}
 
 	utils.SendSuccess(c, http.StatusCreated, "User registered successfully", resp)
+}
+
+// Me retrieves details of the currently authenticated user from the request context.
+func (h *UserHandler) Me(c *gin.Context) {
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "User context not found in request", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.userService.GetByID(c.Request.Context(), authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "USER_NOT_FOUND")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "User profile retrieved successfully", resp)
 }

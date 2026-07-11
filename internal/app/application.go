@@ -65,14 +65,16 @@ func NewApplication() (*Application, error) {
 	// 7. Initialize Services
 	userService := service.NewUserService(repoMgr.Users())
 	linkService := service.NewLinkService(repoMgr.Links(), repoMgr.Analytics(), linkCache, cfg.Server.ShortCodeLength, cfg.Server.MaxGenerationRetries)
+	authService := service.NewAuthService(repoMgr.Users(), repoMgr.RefreshTokens(), cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL, cfg.JWT.Issuer)
 
 	// 8. Initialize Handlers
 	healthHandler := handler.NewHealthHandler(db, redisClient, cfg.BuildVersion, cfg.GitCommit, cfg.Server.Env)
 	linkHandler := handler.NewLinkHandler(linkService)
 	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
 
 	// 9. Setup HTTP Router
-	router := routes.SetupRouter(cfg.Server.RequestTimeout, healthHandler, linkHandler, userHandler)
+	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler)
 
 	// 10. Instantiate HTTP server wrapper
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
