@@ -61,11 +61,15 @@ func SetupRouter(
 			users.GET("/me", authMiddleware, userHandler.Me)
 		}
 
-		// Shortened Links Routes Group
-		links := api.Group("/links")
+		// Shortened Links Routes Group (Fully authenticated for CRUD operations)
+		links := api.Group("/links", authMiddleware)
 		{
-			links.POST("", linkHandler.Shorten)
-			links.GET("/:code/stats", authMiddleware, linkHandler.GetStats)
+			links.POST("", linkHandler.Create)
+			links.GET("", linkHandler.List)
+			links.GET("/:id", linkHandler.Get)
+			links.PATCH("/:id", linkHandler.Update)
+			links.DELETE("/:id", linkHandler.Delete)
+			links.GET("/:code/stats", linkHandler.GetStats)
 		}
 	}
 

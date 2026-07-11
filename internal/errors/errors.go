@@ -24,6 +24,9 @@ var (
 
 	// ErrInternal is returned when an unexpected system error occurs.
 	ErrInternal = errors.New("internal server error")
+
+	// ErrGone is returned when a resource is expired or permanently unavailable.
+	ErrGone = errors.New("resource is gone")
 )
 
 // MapToHTTPStatus resolves domain errors to standard HTTP status codes.
@@ -41,6 +44,8 @@ func MapToHTTPStatus(err error) int {
 		return http.StatusBadRequest
 	case errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrInvalidCredentials):
 		return http.StatusUnauthorized
+	case errors.Is(err, ErrGone):
+		return http.StatusGone
 	default:
 		return http.StatusInternalServerError
 	}

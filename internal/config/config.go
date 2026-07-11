@@ -15,6 +15,7 @@ type ServerConfig struct {
 	RequestTimeout       time.Duration `mapstructure:"SERVER_REQUEST_TIMEOUT"`
 	ShortCodeLength      int           `mapstructure:"SHORT_CODE_LENGTH"`
 	MaxGenerationRetries int           `mapstructure:"MAX_GENERATION_RETRIES"`
+	BaseURL              string        `mapstructure:"BASE_URL"`
 }
 
 // DatabaseConfig stores PostgreSQL credentials and connection settings.
@@ -70,6 +71,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("SERVER_REQUEST_TIMEOUT", "5s")
 	viper.SetDefault("SHORT_CODE_LENGTH", 7)
 	viper.SetDefault("MAX_GENERATION_RETRIES", 5)
+	viper.SetDefault("BASE_URL", "http://localhost:8080")
 	viper.SetDefault("POSTGRES_HOST", "localhost")
 	viper.SetDefault("POSTGRES_PORT", "5432")
 	viper.SetDefault("POSTGRES_DB", "linkpulse_db")
