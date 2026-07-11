@@ -14,9 +14,12 @@ import (
 // SetupRouter binds HTTP endpoints to handlers and registers middlewares.
 func SetupRouter(
 	timeoutDuration time.Duration,
+	jwtSecret string,
+	jwtIssuer string,
 	healthHandler *handler.HealthHandler,
 	linkHandler *handler.LinkHandler,
 	userHandler *handler.UserHandler,
+	authHandler *handler.AuthHandler,
 ) *gin.Engine {
 	// Disable Gin default logging to use our structured slog middleware
 	gin.SetMode(gin.ReleaseMode)
@@ -36,16 +39,33 @@ func SetupRouter(
 	// Redirect Endpoint (Optimized path)
 	r.GET("/r/:code", linkHandler.Resolve)
 
+	// Instantiate authorization middleware wrapper
+	authMiddleware := middleware.Auth(jwtSecret, jwtIssuer)
+
 	// API Group
 	api := r.Group("/api/v1")
 	{
-		// Authentication (Placeholder)
-		api.POST("/users/register", userHandler.Register)
+		// Authentication Routes Group
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/logout", authMiddleware, authHandler.Logout)
+		}
 
+		// User Profile Routes Group
+		users := api.Group("/users")
+		{
+			// Protected user current profile lookup
+			users.GET("/me", authMiddleware, userHandler.Me)
+		}
+
+		// Shortened Links Routes Group
 		links := api.Group("/links")
 		{
 			links.POST("", linkHandler.Shorten)
-			links.GET("/:code/stats", middleware.Auth(), linkHandler.GetStats)
+			links.GET("/:code/stats", authMiddleware, linkHandler.GetStats)
 		}
 	}
 
