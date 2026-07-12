@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"testing"
 	"time"
 
@@ -100,6 +101,20 @@ func (m *mockRefreshRepo) FindActiveByUserID(ctx context.Context, userID uuid.UU
 			active = append(active, *t)
 		}
 	}
+	sort.Slice(active, func(i, j int) bool {
+		tI := active[i].LastUsedAt
+		if tI.IsZero() {
+			tI = active[i].CreatedAt
+		}
+		tJ := active[j].LastUsedAt
+		if tJ.IsZero() {
+			tJ = active[j].CreatedAt
+		}
+		if tI.Equal(tJ) {
+			return active[i].CreatedAt.Before(active[j].CreatedAt)
+		}
+		return tI.Before(tJ)
+	})
 	return active, nil
 }
 

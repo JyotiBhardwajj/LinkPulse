@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"linkpulse/internal/models"
+	"linkpulse/internal/repository"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -117,4 +118,150 @@ func TestAuthService_RolePromotionAndDemotion(t *testing.T) {
 	user, err = userRepo.FindByID(ctx, registerResp.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.RoleUser, user.Role)
+}
+
+func TestAuthService_LogoutAll(t *testing.T) {
+	userRepo := newMockUserRepo()
+	refreshRepo := newMockRefreshRepo()
+	txMgr := &mockTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
+	secret := "supersecretjwtkeythatisreallylongandsecure"
+	issuer := "linkpulse-api"
+	accessTTL := 15 * time.Minute
+	refreshTTL := 7 * 24 * time.Hour
+
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	ctx := context.Background()
+
+	// Register user
+	registerResp, err := service.Register(ctx, "logoutall@example.com", "securepassword123")
+	require.NoError(t, err)
+
+	// Log in twice
+	_, err = service.Login(ctx, "logoutall@example.com", "securepassword123", "Device1", "127.0.0.1", "Mozilla/5.0")
+	require.NoError(t, err)
+	_, err = service.Login(ctx, "logoutall@example.com", "securepassword123", "Device2", "127.0.0.1", "Mozilla/5.0")
+	require.NoError(t, err)
+
+	// Verify we have 2 active sessions
+	active, err := refreshRepo.FindActiveByUserID(ctx, registerResp.ID)
+	require.NoError(t, err)
+	assert.Len(t, active, 2)
+
+	// Logout all
+	err = service.LogoutAll(ctx, registerResp.ID)
+	require.NoError(t, err)
+
+	// Verify we have 0 active sessions
+	activeAfter, err := refreshRepo.FindActiveByUserID(ctx, registerResp.ID)
+	require.NoError(t, err)
+	assert.Len(t, activeAfter, 0)
+}
+
+func TestAuthService_CurrentSessionDetection(t *testing.T) {
+	userRepo := newMockUserRepo()
+	refreshRepo := newMockRefreshRepo()
+	txMgr := &mockTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
+	secret := "supersecretjwtkeythatisreallylongandsecure"
+	issuer := "linkpulse-api"
+	accessTTL := 15 * time.Minute
+	refreshTTL := 7 * 24 * time.Hour
+
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	ctx := context.Background()
+
+	// Register and login
+	registerResp, err := service.Register(ctx, "currentsess@example.com", "securepassword123")
+	require.NoError(t, err)
+
+	_, err = service.Login(ctx, "currentsess@example.com", "securepassword123", "Device1", "127.0.0.1", "Mozilla/5.0")
+	require.NoError(t, err)
+
+	// Find the session ID we generated
+	tokens, err := refreshRepo.FindActiveByUserID(ctx, registerResp.ID)
+	require.NoError(t, err)
+	require.Len(t, tokens, 1)
+
+	sessionID := tokens[0].ID
+
+	// Verify GetSessions detects current session correctly when currentTokenID is passed
+	sessions, err := service.GetSessions(ctx, registerResp.ID, sessionID)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.True(t, sessions[0].CurrentSession)
+
+	// Verify GetSessions does not detect current session if wrong session ID passed
+	sessionsOther, err := service.GetSessions(ctx, registerResp.ID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, sessionsOther, 1)
+	assert.False(t, sessionsOther[0].CurrentSession)
+}
+
+type rollbackMockTxManager struct {
+	userRepo    *mockUserRepo
+	refreshRepo *mockRefreshRepo
+}
+
+func (m *rollbackMockTxManager) WithinTransaction(ctx context.Context, fn func(txRepo repository.RepositoryManager) error) error {
+	// Clone users map
+	userBackup := make(map[string]*models.User)
+	for k, v := range m.userRepo.users {
+		valCopy := *v
+		userBackup[k] = &valCopy
+	}
+
+	// Clone tokens map
+	tokenBackup := make(map[string]*models.RefreshToken)
+	for k, v := range m.refreshRepo.tokens {
+		valCopy := *v
+		tokenBackup[k] = &valCopy
+	}
+
+	err := fn(&mockRepoManager{
+		userRepo:    m.userRepo,
+		refreshRepo: m.refreshRepo,
+	})
+
+	if err != nil {
+		// Rollback: restore state
+		m.userRepo.users = userBackup
+		m.refreshRepo.tokens = tokenBackup
+	}
+
+	return err
+}
+
+func TestAuthService_TransactionRollback(t *testing.T) {
+	userRepo := newMockUserRepo()
+	refreshRepo := newMockRefreshRepo()
+	txMgr := &rollbackMockTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
+	secret := "supersecretjwtkeythatisreallylongandsecure"
+	issuer := "linkpulse-api"
+	accessTTL := 15 * time.Minute
+	refreshTTL := 7 * 24 * time.Hour
+
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	ctx := context.Background()
+
+	// Register user
+	registerResp, err := service.Register(ctx, "rollback@example.com", "securepassword123")
+	require.NoError(t, err)
+
+	// Verify initial role is User
+	user, err := userRepo.FindByID(ctx, registerResp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RoleUser, user.Role)
+
+	// Modify promote user to fail inside transaction or trigger error
+	err = txMgr.WithinTransaction(ctx, func(txRepo repository.RepositoryManager) error {
+		user.Role = models.RoleAdmin
+		_ = txRepo.Users().Update(ctx, user)
+		// Return intentional error to trigger rollback
+		return assert.AnError
+	})
+	assert.Error(t, err)
+
+	// Verify role was NOT updated (remained RoleUser) due to rollback!
+	userAfter, err := userRepo.FindByID(ctx, registerResp.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RoleUser, userAfter.Role)
 }

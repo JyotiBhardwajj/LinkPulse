@@ -78,7 +78,7 @@ func (r *refreshTokenRepository) FindActiveByUserID(ctx context.Context, userID 
 	now := time.Now()
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND revoked_at IS NULL AND expires_at > ?", userID, now).
-		Order("last_used_at asc").
+		Order("COALESCE(last_used_at, created_at) ASC, created_at ASC").
 		Find(&tokens).Error
 	return tokens, err
 }
