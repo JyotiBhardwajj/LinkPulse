@@ -72,6 +72,13 @@ func (p *workerPool) Start(ctx context.Context) {
 
 // Submit inserts event into buffered channel. Drops if queue is full.
 func (p *workerPool) Submit(ctx context.Context, event ClickEvent) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.stopped {
+		return fmt.Errorf("worker pool is stopped")
+	}
+
 	select {
 	case p.queue <- event:
 		return nil
@@ -91,10 +98,11 @@ func (p *workerPool) Shutdown(ctx context.Context) error {
 	p.onceStop.Do(func() {
 		p.mu.Lock()
 		p.stopped = true
-		p.mu.Unlock()
-		slog.Info("Shutting down worker pool gracefully")
 		close(p.stopChan)
 		close(p.queue)
+		p.mu.Unlock()
+
+		slog.Info("Shutting down worker pool gracefully")
 
 		done := make(chan struct{})
 		go func() {

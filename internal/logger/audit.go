@@ -143,9 +143,15 @@ func (l *asyncAuditLogger) Close(ctx context.Context) error {
 		l.stopped = true
 		l.mu.Unlock()
 
+		// Reset globalAuditLogger so subsequent tests fallback to no-op audit logger
+		auditLoggerMu.Lock()
+		if globalAuditLogger == l {
+			globalAuditLogger = nil
+		}
+		auditLoggerMu.Unlock()
+
 		slog.Info("Closing audit logger gracefully, draining remaining records")
 		close(l.stopChan)
-		close(l.queue)
 
 		done := make(chan struct{})
 		go func() {
@@ -170,15 +176,16 @@ func (l *asyncAuditLogger) workerLoop(ctx context.Context) {
 	for {
 		select {
 		case <-l.stopChan:
-			// Drain remaining events in channel
-			for rec := range l.queue {
-				l.flushRecord(rec)
+			// Drain remaining events in channel non-blockingly
+			for {
+				select {
+				case rec := <-l.queue:
+					l.flushRecord(rec)
+				default:
+					return
+				}
 			}
-			return
-		case rec, ok := <-l.queue:
-			if !ok {
-				return
-			}
+		case rec := <-l.queue:
 			l.flushRecord(rec)
 		}
 	}
