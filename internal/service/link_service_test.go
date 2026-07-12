@@ -155,11 +155,23 @@ func (m *mockAnalyticsRepo) Create(ctx context.Context, analytics *models.Analyt
 func (m *mockAnalyticsRepo) GetClicksCount(ctx context.Context, linkID uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (m *mockAnalyticsRepo) GetBrowserDistribution(ctx context.Context, linkID uuid.UUID) (map[string]int64, error) {
+func (m *mockAnalyticsRepo) GetOverview(ctx context.Context, userID uuid.UUID) (*models.AnalyticsOverview, error) {
+	return nil, nil
+}
+func (m *mockAnalyticsRepo) GetClicksOverTime(ctx context.Context, q models.AnalyticsQuery) ([]models.ClickTimeMetric, error) {
+	return []models.ClickTimeMetric{}, nil
+}
+func (m *mockAnalyticsRepo) GetBrowserDistribution(ctx context.Context, q models.AnalyticsQuery) (map[string]int64, error) {
 	return make(map[string]int64), nil
 }
-func (m *mockAnalyticsRepo) GetClicksOverTime(ctx context.Context, linkID uuid.UUID, interval string) ([]models.ClickTimeMetric, error) {
-	return []models.ClickTimeMetric{}, nil
+func (m *mockAnalyticsRepo) GetDeviceDistribution(ctx context.Context, q models.AnalyticsQuery) (map[string]int64, error) {
+	return nil, nil
+}
+func (m *mockAnalyticsRepo) GetReferrerDistribution(ctx context.Context, q models.AnalyticsQuery) (map[string]int64, error) {
+	return nil, nil
+}
+func (m *mockAnalyticsRepo) GetTopLinks(ctx context.Context, userID uuid.UUID, limit int) ([]models.TopLinkMetric, error) {
+	return nil, nil
 }
 
 // Simple in-memory mock LinkCache

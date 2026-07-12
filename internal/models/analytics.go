@@ -21,3 +21,14 @@ type Analytics struct {
 	Referrer  string    `gorm:"type:text" json:"referrer"`
 	UserAgent string    `gorm:"type:text" json:"user_agent"`
 }
+
+// AnalyticsQuery encapsulates all parameters for filtering and grouping click events.
+type AnalyticsQuery struct {
+	UserID    uuid.UUID
+	LinkID    *uuid.UUID
+	StartDate time.Time
+	EndDate   time.Time
+	Interval  string
+	Limit     int
+}
+

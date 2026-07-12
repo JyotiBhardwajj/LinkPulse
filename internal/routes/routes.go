@@ -20,6 +20,7 @@ func SetupRouter(
 	linkHandler *handler.LinkHandler,
 	userHandler *handler.UserHandler,
 	authHandler *handler.AuthHandler,
+	analyticsHandler *handler.AnalyticsHandler,
 ) *gin.Engine {
 	// Disable Gin default logging to use our structured slog middleware
 	gin.SetMode(gin.ReleaseMode)
@@ -70,6 +71,18 @@ func SetupRouter(
 			links.PATCH("/:id", linkHandler.Update)
 			links.DELETE("/:id", linkHandler.Delete)
 			links.GET("/:code/stats", linkHandler.GetStats)
+			links.GET("/:id/analytics", analyticsHandler.GetLinkAnalytics)
+		}
+
+		// Analytics Routes Group (Fully authenticated for metrics dashboard)
+		analytics := api.Group("/analytics", authMiddleware)
+		{
+			analytics.GET("/overview", analyticsHandler.GetOverview)
+			analytics.GET("/clicks", analyticsHandler.GetClicksOverTime)
+			analytics.GET("/top-links", analyticsHandler.GetTopLinks)
+			analytics.GET("/devices", analyticsHandler.GetDeviceDistribution)
+			analytics.GET("/browsers", analyticsHandler.GetBrowserDistribution)
+			analytics.GET("/referrers", analyticsHandler.GetReferrerDistribution)
 		}
 	}
 

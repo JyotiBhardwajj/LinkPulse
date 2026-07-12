@@ -119,3 +119,47 @@ type ClickTimeMetric struct {
 	ClickCount int64     `json:"click_count"`
 }
 
+// AnalyticsOverview represents global statistics for a user's link portfolio.
+type AnalyticsOverview struct {
+	TotalLinks       int64 `json:"total_links"`
+	ActiveLinks      int64 `json:"active_links"`
+	InactiveLinks    int64 `json:"inactive_links"`
+	TotalClicks      int64 `json:"total_clicks"`
+	TodayClicks      int64 `json:"today_clicks"`
+	Last7DaysClicks  int64 `json:"last_7_days_clicks"`
+	Last30DaysClicks int64 `json:"last_30_days_clicks"`
+}
+
+// ClickTimeSeriesPoint represents a single data point in a click timeline.
+type ClickTimeSeriesPoint struct {
+	Timestamp string `json:"timestamp"`
+	Clicks    int64  `json:"clicks"`
+}
+
+// TopLinkMetric represents a top performing shortened link.
+type TopLinkMetric struct {
+	ShortCode     string     `json:"short_code"`
+	OriginalURL   string     `json:"original_url"`
+	ClickCount    int64      `json:"click_count"`
+	LastClickedAt *time.Time `json:"last_clicked_at,omitempty"`
+}
+
+// DistributionItem represents a percentage/count tuple.
+type DistributionItem struct {
+	Name       string  `json:"name"`
+	Count      int64   `json:"count"`
+	Percentage float64 `json:"percentage"`
+}
+
+// LinkAnalyticsResponse represents the full analytical report of a single link.
+type LinkAnalyticsResponse struct {
+	LinkID              uuid.UUID              `json:"link_id"`
+	OriginalURL         string                 `json:"original_url"`
+	ShortCode           string                 `json:"short_code"`
+	TotalClicks         int64                  `json:"total_clicks"`
+	ClicksOverTime      []ClickTimeSeriesPoint `json:"clicks_over_time"`
+	BrowserDistribution []DistributionItem     `json:"browser_distribution"`
+	DeviceDistribution  []DistributionItem     `json:"device_distribution"`
+	TopReferrers        []DistributionItem     `json:"top_referrers"`
+}
+

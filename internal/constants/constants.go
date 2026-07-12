@@ -16,6 +16,12 @@ const (
 
 	// DefaultShortCodeLength is the fallback length for slug generation.
 	DefaultShortCodeLength = 7
+
+	// Analytics intervals constants
+	AnalyticsIntervalHour  = "hour"
+	AnalyticsIntervalDay   = "day"
+	AnalyticsIntervalWeek  = "week"
+	AnalyticsIntervalMonth = "month"
 )
 
 // ReservedAliases contains list of slug keywords that cannot be registered by users.

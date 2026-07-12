@@ -80,6 +80,7 @@ func NewApplication() (*Application, error) {
 		cfg.Cache.TTL,
 	)
 	authService := service.NewAuthService(repoMgr.Users(), repoMgr.RefreshTokens(), cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL, cfg.JWT.Issuer)
+	analyticsService := service.NewAnalyticsService(repoMgr.Analytics(), repoMgr.Links())
 
 	// 9. Initialize CleanupScheduler
 	cleanupScheduler := worker.NewCleanupScheduler(linkService, cfg.Cleanup.Interval)
@@ -89,9 +90,10 @@ func NewApplication() (*Application, error) {
 	linkHandler := handler.NewLinkHandler(linkService, workerPool)
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(authService)
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	// 11. Setup HTTP Router
-	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler)
+	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler)
 
 	// 12. Instantiate HTTP server wrapper
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)

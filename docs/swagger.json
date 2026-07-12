@@ -84,6 +84,147 @@
           }
         }
       }
+    },
+    "/api/v1/analytics/overview": {
+      "get": {
+        "summary": "Portfolio Analytics Overview",
+        "description": "Returns aggregated summary metrics for all links belonging to the authenticated user.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Overview metrics retrieved successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/clicks": {
+      "get": {
+        "summary": "Time-Series Click History",
+        "description": "Returns zero-filled click history timeline counts grouped by time buckets.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "interval", "in": "query", "schema": { "type": "string", "enum": ["hour", "day", "week", "month"], "default": "day" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeline compiled successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/top-links": {
+      "get": {
+        "summary": "Top Performing Links",
+        "description": "Returns shortened links ordered by total click counts.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top links retrieved successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/devices": {
+      "get": {
+        "summary": "Device Distribution",
+        "description": "Returns device platform percentages and counts (Desktop, Mobile, Tablet, Unknown).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices distribution compiled successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/browsers": {
+      "get": {
+        "summary": "Browser Distribution",
+        "description": "Returns browser agent counts and percentages (Chrome, Firefox, Safari, Edge, Opera, Unknown).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Browsers distribution compiled successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/referrers": {
+      "get": {
+        "summary": "Referrer Domain Distribution",
+        "description": "Returns top domain sources referring click traffic.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Referrers compiled successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/links/{id}/analytics": {
+      "get": {
+        "summary": "Detailed Single Link Analytics",
+        "description": "Returns full metrics suite (time-series, devices, browsers, referrers) for a specific shortened link ID.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link analytics report compiled successfully"
+          },
+          "404": {
+            "description": "Link not found or ownership check failed"
+          }
+        }
+      }
     }
   },
   "components": {

@@ -415,3 +415,41 @@ Prepare these answers for SDE interviews when demonstrating this project:
    * *Answer*: It isolates database wire-up details in the bootstrap layer (`internal/app`). Services receive only the concrete interfaces they require, maintaining mockability without knowing how repos are constructed.
 4. **How would you scale this URL shortener to handle 100k redirect requests per second?**
    * *Answer*: Increase Redis replicas to handle read distribution, use a consistent hashing load balancer to route requests, and offload background click writes by pushing analytics events into a distributed message log like Apache Kafka.
+
+---
+
+## 9. Analytics Engine Architecture & Optimizations
+
+### A. Analytics Request Flow
+```
+[Client Request]
+       │
+       ▼
+[Handler: Date Validation & Limit Clamping]
+       │
+       ▼
+[Service: Timezone Realignment & Zero-Fill Logic]
+       │
+       ▼
+[Repository: Raw SQL Aggregation Queries]
+       │
+       ▼
+[PostgreSQL Engine (targeting indices: idx_analytics_link_clicked)]
+```
+
+### B. Aggregation Strategy & GORM Bypass Rationale
+LinkPulse bypasses GORM's built-in query generation and uses **Raw SQL** for analytics aggregation for three reasons:
+1. **Time-Series Truncations**: Grouping by variable intervals (hour, day, week, month) requires database-level time truncations like `date_trunc` which are specific to PostgreSQL and hard to compile cleanly using standard ORM query builders.
+2. **Referring Domain Extraction**: Aggregating referrers by domain rather than complete query URLs utilizes regular expression matching: `regexp_replace(referrer, '^https?://([^/]+).*$', '\1')`.
+3. **Optimized execution**: Explicit Raw SQL prevents GORM from adding default wrappers, ensuring PostgreSQL uses index scans (`idx_analytics_link_clicked`) instead of expensive sequential scans.
+
+### C. Expected Query Complexity
+- **Overview Stats**: $O(K)$ where $K$ is the number of links matching `user_id`. PostgreSQL processes count queries using Index-Only scans.
+- **Timeline/Distributions**: $O(\log N + M)$ where $N$ is total click events in `analytics` and $M$ is the number of matching records in the requested date range. Scoped via index `(link_id, clicked_at)`.
+
+### D. Future Analytics Scalability Roadmap
+1. **Materialized Views**: Compute browser/device ratios periodically (e.g. hourly) to offload real-time aggregation queries.
+2. **Click Aggregation Tables**: Store pre-aggregated daily/hourly counters for shortened links to avoid querying raw click logs for dashboards.
+3. **PostgreSQL Partitioning**: Partition the `analytics` table horizontally by month/year bounds to keep indices small and facilitate fast archival drops.
+4. **Redis Leaderboards**: Cache top links in sorted sets (`ZSET`) updated in real-time by the worker pool to bypass PostgreSQL entirely for top-links queries.
+
