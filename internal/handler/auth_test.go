@@ -12,6 +12,7 @@ import (
 	domainErrors "linkpulse/internal/errors"
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
+	"linkpulse/internal/repository"
 	"linkpulse/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,11 @@ func (m *mockUserRepo) FindByEmail(ctx context.Context, email string) (*models.U
 		return nil, domainErrors.ErrNotFound
 	}
 	return u, nil
+}
+
+func (m *mockUserRepo) Update(ctx context.Context, user *models.User) error {
+	m.users[user.Email] = user
+	return nil
 }
 
 type mockRefreshRepo struct {
@@ -86,6 +92,17 @@ func (m *mockRefreshRepo) RevokeAllForUser(ctx context.Context, userID uuid.UUID
 	return nil
 }
 
+func (m *mockRefreshRepo) FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.RefreshToken, error) {
+	var active []models.RefreshToken
+	now := time.Now()
+	for _, t := range m.tokens {
+		if t.UserID == userID && t.RevokedAt == nil && t.ExpiresAt.After(now) {
+			active = append(active, *t)
+		}
+	}
+	return active, nil
+}
+
 type mockUserService struct {
 	userRepo *mockUserRepo
 }
@@ -100,12 +117,46 @@ func (s *mockUserService) Register(ctx context.Context, req models.UserRegisterR
 	return &models.UserResponse{ID: user.ID, Email: user.Email, CreatedAt: user.CreatedAt}, nil
 }
 
-func (s *mockUserService) GetByID(ctx context.Context, id uuid.UUID) (*models.UserResponse, error) {
+func (s *mockUserService) GetByID(ctx context.Context, id uuid.UUID) (*models.UserProfileResponse, error) {
 	user, err := s.userRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return &models.UserResponse{ID: user.ID, Email: user.Email, CreatedAt: user.CreatedAt}, nil
+	return &models.UserProfileResponse{ID: user.ID, Email: user.Email, Role: user.Role, CreatedAt: user.CreatedAt}, nil
+}
+
+type mockTxManager struct {
+	userRepo    *mockUserRepo
+	refreshRepo *mockRefreshRepo
+}
+
+func (m *mockTxManager) WithinTransaction(ctx context.Context, fn func(txRepo repository.RepositoryManager) error) error {
+	repoMgr := &mockRepoManager{
+		userRepo:    m.userRepo,
+		refreshRepo: m.refreshRepo,
+	}
+	return fn(repoMgr)
+}
+
+type mockRepoManager struct {
+	userRepo    *mockUserRepo
+	refreshRepo *mockRefreshRepo
+}
+
+func (m *mockRepoManager) Users() repository.UserRepository {
+	return m.userRepo
+}
+
+func (m *mockRepoManager) Links() repository.LinkRepository {
+	return nil
+}
+
+func (m *mockRepoManager) Analytics() repository.AnalyticsRepository {
+	return nil
+}
+
+func (m *mockRepoManager) RefreshTokens() repository.RefreshTokenRepository {
+	return m.refreshRepo
 }
 
 func TestAuthHandler_Integration(t *testing.T) {
@@ -113,12 +164,13 @@ func TestAuthHandler_Integration(t *testing.T) {
 
 	userRepo := &mockUserRepo{users: make(map[string]*models.User)}
 	refreshRepo := &mockRefreshRepo{tokens: make(map[string]*models.RefreshToken)}
+	txMgr := &mockTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
 	secret := "handlertestsecretkeythatisreallylong"
 	issuer := "linkpulse-api"
 	accessTTL := 5 * time.Minute
 	refreshTTL := 24 * time.Hour
 
-	authService := service.NewAuthService(userRepo, refreshRepo, secret, accessTTL, refreshTTL, issuer)
+	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
 	mockUS := &mockUserService{userRepo: userRepo}
 
 	// Handlers

@@ -21,8 +21,10 @@ func RequestID() gin.HandlerFunc {
 		c.Header("X-Request-ID", reqID)
 		// Store in Gin context
 		c.Set(string(constants.RequestIDKey), reqID)
-		// Store in standard Go context
+		c.Set(string(constants.ClientIPKey), c.ClientIP())
+
 		ctx := context.WithValue(c.Request.Context(), constants.RequestIDKey, reqID)
+		ctx = context.WithValue(ctx, constants.ClientIPKey, c.ClientIP())
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()

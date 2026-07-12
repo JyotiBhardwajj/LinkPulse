@@ -8,6 +8,7 @@ import (
 
 	domainErrors "linkpulse/internal/errors"
 	"linkpulse/internal/models"
+	"linkpulse/internal/repository"
 	"linkpulse/internal/utils"
 
 	"github.com/google/uuid"
@@ -47,6 +48,11 @@ func (m *mockUserRepo) FindByEmail(ctx context.Context, email string) (*models.U
 		return nil, domainErrors.ErrNotFound
 	}
 	return u, nil
+}
+
+func (m *mockUserRepo) Update(ctx context.Context, user *models.User) error {
+	m.users[user.Email] = user
+	return nil
 }
 
 // In-memory mock RefreshTokenRepository
@@ -91,15 +97,61 @@ func (m *mockRefreshRepo) RevokeAllForUser(ctx context.Context, userID uuid.UUID
 	return nil
 }
 
+func (m *mockRefreshRepo) FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.RefreshToken, error) {
+	var active []models.RefreshToken
+	now := time.Now()
+	for _, t := range m.tokens {
+		if t.UserID == userID && t.RevokedAt == nil && t.ExpiresAt.After(now) {
+			active = append(active, *t)
+		}
+	}
+	return active, nil
+}
+
+type mockTxManager struct {
+	userRepo    *mockUserRepo
+	refreshRepo *mockRefreshRepo
+}
+
+func (m *mockTxManager) WithinTransaction(ctx context.Context, fn func(txRepo repository.RepositoryManager) error) error {
+	repoMgr := &mockRepoManager{
+		userRepo:    m.userRepo,
+		refreshRepo: m.refreshRepo,
+	}
+	return fn(repoMgr)
+}
+
+type mockRepoManager struct {
+	userRepo    *mockUserRepo
+	refreshRepo *mockRefreshRepo
+}
+
+func (m *mockRepoManager) Users() repository.UserRepository {
+	return m.userRepo
+}
+
+func (m *mockRepoManager) Links() repository.LinkRepository {
+	return nil
+}
+
+func (m *mockRepoManager) Analytics() repository.AnalyticsRepository {
+	return nil
+}
+
+func (m *mockRepoManager) RefreshTokens() repository.RefreshTokenRepository {
+	return m.refreshRepo
+}
+
 func TestAuthService_Lifecycle(t *testing.T) {
 	userRepo := newMockUserRepo()
 	refreshRepo := newMockRefreshRepo()
+	txMgr := &mockTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
 	secret := "supersecretjwtkeythatisreallylongandsecure"
 	issuer := "linkpulse-api"
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, secret, accessTTL, refreshTTL, issuer)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
 	ctx := context.Background()
 
 	t.Run("User Registration succeeds", func(t *testing.T) {

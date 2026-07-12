@@ -13,6 +13,7 @@ import (
 	domainErrors "linkpulse/internal/errors"
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
+	"linkpulse/internal/repository"
 	"linkpulse/internal/service"
 	"linkpulse/internal/worker"
 
@@ -26,10 +27,13 @@ type localUserRepo struct{}
 
 func (m *localUserRepo) Create(ctx context.Context, user *models.User) error { return nil }
 func (m *localUserRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
-	return &models.User{ID: id, Email: "user@example.com"}, nil
+	return &models.User{ID: id, Email: "user@example.com", Role: models.RoleUser}, nil
 }
 func (m *localUserRepo) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	return nil, nil
+}
+func (m *localUserRepo) Update(ctx context.Context, user *models.User) error {
+	return nil
 }
 
 type localRefreshRepo struct{}
@@ -41,6 +45,9 @@ func (m *localRefreshRepo) FindByHash(ctx context.Context, hash string) (*models
 func (m *localRefreshRepo) Revoke(ctx context.Context, hash string) error { return nil }
 func (m *localRefreshRepo) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error {
 	return nil
+}
+func (m *localRefreshRepo) FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.RefreshToken, error) {
+	return nil, nil
 }
 
 // Redefine mock repositories locally inside handler tests
@@ -154,11 +161,46 @@ func (m *localWorkerPool) Ready(ctx context.Context) error {
 	return nil
 }
 
+type localTxManager struct {
+	userRepo    *localUserRepo
+	refreshRepo *localRefreshRepo
+}
+
+func (m *localTxManager) WithinTransaction(ctx context.Context, fn func(txRepo repository.RepositoryManager) error) error {
+	repoMgr := &localRepoManager{
+		userRepo:    m.userRepo,
+		refreshRepo: m.refreshRepo,
+	}
+	return fn(repoMgr)
+}
+
+type localRepoManager struct {
+	userRepo    *localUserRepo
+	refreshRepo *localRefreshRepo
+}
+
+func (m *localRepoManager) Users() repository.UserRepository {
+	return m.userRepo
+}
+
+func (m *localRepoManager) Links() repository.LinkRepository {
+	return nil
+}
+
+func (m *localRepoManager) Analytics() repository.AnalyticsRepository {
+	return nil
+}
+
+func (m *localRepoManager) RefreshTokens() repository.RefreshTokenRepository {
+	return m.refreshRepo
+}
+
 func TestLinkHandler_Integration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	userRepo := &localUserRepo{}
 	refreshRepo := &localRefreshRepo{}
+	txMgr := &localTxManager{userRepo: userRepo, refreshRepo: refreshRepo}
 	linkRepo := &localLinkRepo{links: make(map[uuid.UUID]*models.Link)}
 	analyticsRepo := &localAnalyticsRepo{}
 	linkCache := &localLinkCache{store: make(map[string]*models.CachedLink)}
@@ -168,7 +210,7 @@ func TestLinkHandler_Integration(t *testing.T) {
 	refreshTTL := 24 * time.Hour
 	baseURL := "http://localhost:8080"
 
-	authService := service.NewAuthService(userRepo, refreshRepo, secret, accessTTL, refreshTTL, issuer)
+	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
 	linkService := service.NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
 	workerPool := &localWorkerPool{}
 
@@ -193,7 +235,7 @@ func TestLinkHandler_Integration(t *testing.T) {
 
 	// Forge token manually for simplicity
 	claimsUserID := uuid.New()
-	token, _ := auth.GenerateAccessToken(claimsUserID, "user@example.com", secret, accessTTL, issuer)
+	token, _ := auth.GenerateAccessToken(claimsUserID, "user@example.com", models.RoleUser, secret, accessTTL, issuer)
 	_ = authService // Bypasses unused warning
 
 	t.Run("POST /links creates shortened URL", func(t *testing.T) {

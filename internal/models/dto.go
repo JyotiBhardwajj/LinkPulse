@@ -32,8 +32,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-// SessionResponse represents checks returned to determine authentication states.
-type SessionResponse struct {
+// AuthStatusResponse represents checks returned to determine authentication states.
+type AuthStatusResponse struct {
 	Authenticated bool         `json:"authenticated"`
 	User          UserResponse `json:"user"`
 }
@@ -178,5 +178,25 @@ type ReadyResponse struct {
 	Redis      string    `json:"redis"`
 	WorkerPool string    `json:"worker_pool"`
 	Timestamp  time.Time `json:"timestamp"`
+}
+
+// UserProfileResponse defines the payload returned for user details.
+type UserProfileResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Role      Role      `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SessionResponse defines the structure of an active login session.
+type SessionResponse struct {
+	SessionID      uuid.UUID `json:"session_id"`
+	Device         string    `json:"device"`
+	Browser        string    `json:"browser"`
+	OS             string    `json:"os"`
+	IPHash         string    `json:"ip_hash"`
+	LastUsed       time.Time `json:"last_used"`
+	CreatedAt      time.Time `json:"created_at"`
+	CurrentSession bool      `json:"current_session"`
 }
 

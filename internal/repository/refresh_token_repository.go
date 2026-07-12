@@ -19,6 +19,7 @@ type RefreshTokenRepository interface {
 	FindByHash(ctx context.Context, hash string) (*models.RefreshToken, error)
 	Revoke(ctx context.Context, hash string) error
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
+	FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.RefreshToken, error)
 }
 
 type refreshTokenRepository struct {
@@ -69,4 +70,15 @@ func (r *refreshTokenRepository) RevokeAllForUser(ctx context.Context, userID uu
 	return r.db.WithContext(ctx).Model(&models.RefreshToken{}).
 		Where("user_id = ? AND revoked_at IS NULL", userID).
 		Update("revoked_at", &now).Error
+}
+
+// FindActiveByUserID returns all active refresh tokens for a user, sorted by last_used_at ascending (oldest first).
+func (r *refreshTokenRepository) FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]models.RefreshToken, error) {
+	var tokens []models.RefreshToken
+	now := time.Now()
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND revoked_at IS NULL AND expires_at > ?", userID, now).
+		Order("last_used_at asc").
+		Find(&tokens).Error
+	return tokens, err
 }

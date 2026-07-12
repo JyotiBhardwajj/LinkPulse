@@ -56,11 +56,12 @@ type CleanupConfig struct {
 
 // JWTConfig stores authentication secret keys and expiration values.
 type JWTConfig struct {
-	Secret           string        `mapstructure:"JWT_SECRET"`
-	AccessTokenTTL   time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
-	RefreshTokenTTL  time.Duration `mapstructure:"REFRESH_TOKEN_TTL"`
-	Issuer           string        `mapstructure:"TOKEN_ISSUER"`
-	MaxLoginAttempts int           `mapstructure:"MAX_LOGIN_ATTEMPTS"`
+	Secret             string        `mapstructure:"JWT_SECRET"`
+	AccessTokenTTL     time.Duration `mapstructure:"ACCESS_TOKEN_TTL"`
+	RefreshTokenTTL    time.Duration `mapstructure:"REFRESH_TOKEN_TTL"`
+	Issuer             string        `mapstructure:"TOKEN_ISSUER"`
+	MaxLoginAttempts   int           `mapstructure:"MAX_LOGIN_ATTEMPTS"`
+	MaxSessionsPerUser int           `mapstructure:"MAX_SESSIONS_PER_USER"`
 }
 
 // Config is the top-level configuration container for LinkPulse.
@@ -118,6 +119,9 @@ func (c *Config) Validate() error {
 	if c.JWT.RefreshTokenTTL <= c.JWT.AccessTokenTTL {
 		return fmt.Errorf("REFRESH_TOKEN_TTL must be greater than ACCESS_TOKEN_TTL")
 	}
+	if c.JWT.MaxSessionsPerUser <= 0 {
+		return fmt.Errorf("MAX_SESSIONS_PER_USER must be greater than 0")
+	}
 
 	return nil
 }
@@ -152,6 +156,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("REFRESH_TOKEN_TTL", "7d")
 	viper.SetDefault("TOKEN_ISSUER", "linkpulse-api")
 	viper.SetDefault("MAX_LOGIN_ATTEMPTS", 5)
+	viper.SetDefault("MAX_SESSIONS_PER_USER", 10)
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("BUILD_VERSION", "1.0.0")
 	viper.SetDefault("GIT_COMMIT", "unknown")

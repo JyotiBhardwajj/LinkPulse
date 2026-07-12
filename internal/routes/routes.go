@@ -7,6 +7,7 @@ import (
 
 	"linkpulse/internal/handler"
 	"linkpulse/internal/middleware"
+	"linkpulse/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,6 +55,8 @@ func SetupRouter(
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", authMiddleware, authHandler.Logout)
+			auth.GET("/sessions", authMiddleware, authHandler.GetSessions)
+			auth.POST("/logout-all", authMiddleware, authHandler.LogoutAll)
 		}
 
 		// User Profile Routes Group
@@ -84,6 +87,14 @@ func SetupRouter(
 			analytics.GET("/devices", analyticsHandler.GetDeviceDistribution)
 			analytics.GET("/browsers", analyticsHandler.GetBrowserDistribution)
 			analytics.GET("/referrers", analyticsHandler.GetReferrerDistribution)
+		}
+
+		// Admin Routes Group (RBAC Protected placeholder)
+		admin := api.Group("/admin", authMiddleware, middleware.RequireRole(models.RoleAdmin))
+		{
+			admin.Any("/*path", func(c *gin.Context) {
+				c.Status(http.StatusNotImplemented)
+			})
 		}
 	}
 

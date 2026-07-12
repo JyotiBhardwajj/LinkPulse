@@ -15,7 +15,7 @@ import (
 // UserService defines user management operations.
 type UserService interface {
 	Register(ctx context.Context, req models.UserRegisterRequest) (*models.UserResponse, error)
-	GetByID(ctx context.Context, id uuid.UUID) (*models.UserResponse, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*models.UserProfileResponse, error)
 }
 
 type userService struct {
@@ -38,6 +38,7 @@ func (s *userService) Register(ctx context.Context, req models.UserRegisterReque
 		ID:           uuid.New(),
 		Email:        req.Email,
 		PasswordHash: hashedPassword,
+		Role:         models.RoleUser, // default role
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -53,16 +54,17 @@ func (s *userService) Register(ctx context.Context, req models.UserRegisterReque
 	}, nil
 }
 
-// GetByID fetches user details by their ID.
-func (s *userService) GetByID(ctx context.Context, id uuid.UUID) (*models.UserResponse, error) {
+// GetByID fetches user details by their ID returning a UserProfileResponse.
+func (s *userService) GetByID(ctx context.Context, id uuid.UUID) (*models.UserProfileResponse, error) {
 	user, err := s.userRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return &models.UserResponse{
+	return &models.UserProfileResponse{
 		ID:        user.ID,
 		Email:     user.Email,
+		Role:      user.Role,
 		CreatedAt: user.CreatedAt,
 	}, nil
 }

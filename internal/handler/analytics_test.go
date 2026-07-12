@@ -80,7 +80,7 @@ func TestAnalyticsHandler_Integration(t *testing.T) {
 	}
 
 	claimsUserID := uuid.New()
-	token, _ := auth.GenerateAccessToken(claimsUserID, "user@example.com", secret, accessTTL, issuer)
+	token, _ := auth.GenerateAccessToken(claimsUserID, "user@example.com", models.RoleUser, secret, accessTTL, issuer)
 
 	t.Run("GET /analytics/overview returns aggregated overview stats", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/v1/analytics/overview", nil)

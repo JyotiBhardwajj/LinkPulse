@@ -46,9 +46,12 @@ func Auth(secret string, issuer string) gin.HandlerFunc {
 			return
 		}
 
+		sessionID, _ := uuid.Parse(claims.ID)
 		authCtx := auth.AuthContext{
-			UserID: userID,
-			Email:  claims.Email,
+			UserID:    userID,
+			Email:     claims.Email,
+			Role:      claims.Role,
+			SessionID: sessionID,
 		}
 
 		// Inject in Gin context

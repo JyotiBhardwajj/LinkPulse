@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/service"
 	"linkpulse/internal/utils"
@@ -103,4 +104,40 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	utils.SendSuccess(c, http.StatusOK, "Logout successful", nil)
+}
+
+// GetSessions lists all active sessions for the current authenticated user.
+func (h *AuthHandler) GetSessions(c *gin.Context) {
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "User context not found in request", "UNAUTHORIZED")
+		return
+	}
+
+	resp, err := h.authService.GetSessions(c.Request.Context(), authCtx.UserID, authCtx.SessionID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "GET_SESSIONS_FAILED")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "Active sessions retrieved successfully", resp)
+}
+
+// LogoutAll revokes all refresh tokens for the current authenticated user.
+func (h *AuthHandler) LogoutAll(c *gin.Context) {
+	authCtx, ok := middleware.GetAuthContext(c)
+	if !ok {
+		utils.SendError(c, http.StatusUnauthorized, "User context not found in request", "UNAUTHORIZED")
+		return
+	}
+
+	err := h.authService.LogoutAll(c.Request.Context(), authCtx.UserID)
+	if err != nil {
+		status := domainErrors.MapToHTTPStatus(err)
+		utils.SendError(c, status, err.Error(), "LOGOUT_ALL_FAILED")
+		return
+	}
+
+	utils.SendSuccess(c, http.StatusOK, "All sessions revoked successfully", nil)
 }

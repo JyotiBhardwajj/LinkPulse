@@ -31,6 +31,7 @@ type Application struct {
 	httpServer       *http.Server
 	workerPool       worker.WorkerPool
 	cleanupScheduler *worker.CleanupScheduler
+	auditLogger      logger.AsyncAuditLogger
 }
 
 // NewApplication instantiates all components and connects to external stores.
@@ -45,38 +46,46 @@ func NewApplication() (*Application, error) {
 	_ = logger.InitLogger(cfg.Server.Env, cfg.LogLevel)
 	slog.Info("Initializing LinkPulse application components")
 
-	// 3. Connect to PostgreSQL
+	// 3. Initialize and start Asynchronous Audit Logger
+	auditLogger := logger.InitAuditLogger(1000)
+	auditLogger.Start(context.Background())
+
+	// 4. Connect to PostgreSQL
 	db, err := database.NewPostgresDB(cfg.Database)
 	if err != nil {
+		_ = auditLogger.Close(context.Background())
 		return nil, fmt.Errorf("postgres error: %w", err)
 	}
 
-	// 4. Verify PostgreSQL migrations are applied
+	// 5. Verify PostgreSQL migrations are applied
 	tables := []string{"users", "links", "analytics", "refresh_tokens"}
 	for _, table := range tables {
 		if !db.DB.Migrator().HasTable(table) {
 			_ = db.Close()
+			_ = auditLogger.Close(context.Background())
 			return nil, fmt.Errorf("migration verification failed: table '%s' is missing", table)
 		}
 	}
 
-	// 5. Connect to Redis
+	// 6. Connect to Redis
 	redisClient, err := cache.NewRedisClient(cfg.Redis)
 	if err != nil {
 		_ = db.Close()
+		_ = auditLogger.Close(context.Background())
 		return nil, fmt.Errorf("redis error: %w", err)
 	}
 
-	// 6. Initialize LinkCache (using prefix namespacing)
+	// 7. Initialize LinkCache (using prefix namespacing)
 	linkCache := cache.NewLinkCache(redisClient, cfg.Cache.Prefix)
 
-	// 7. Initialize Repositories (RepositoryManager)
+	// 8. Initialize Repositories (RepositoryManager) and TransactionManager
 	repoMgr := repository.NewRepositoryManager(db.DB)
+	txMgr := repository.NewTransactionManager(db.DB)
 
-	// 8. Initialize WorkerPool
+	// 9. Initialize WorkerPool
 	workerPool := worker.NewWorkerPool(repoMgr.Analytics(), cfg.Worker.Count, cfg.Worker.QueueSize)
 
-	// 9. Initialize Services
+	// 10. Initialize Services
 	userService := service.NewUserService(repoMgr.Users())
 	linkService := service.NewLinkService(
 		repoMgr.Links(),
@@ -87,7 +96,16 @@ func NewApplication() (*Application, error) {
 		cfg.Server.BaseURL,
 		cfg.Cache.TTL,
 	)
-	authService := service.NewAuthService(repoMgr.Users(), repoMgr.RefreshTokens(), cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL, cfg.JWT.Issuer)
+	authService := service.NewAuthService(
+		repoMgr.Users(),
+		repoMgr.RefreshTokens(),
+		txMgr,
+		cfg.JWT.Secret,
+		cfg.JWT.AccessTokenTTL,
+		cfg.JWT.RefreshTokenTTL,
+		cfg.JWT.Issuer,
+		cfg.JWT.MaxSessionsPerUser,
+	)
 	analyticsService := service.NewAnalyticsService(repoMgr.Analytics(), repoMgr.Links())
 
 	// Initialize ReadinessService with parallel checker map
@@ -98,20 +116,20 @@ func NewApplication() (*Application, error) {
 	}
 	readyService := service.NewReadinessService(checkers)
 
-	// 10. Initialize CleanupScheduler
+	// 11. Initialize CleanupScheduler
 	cleanupScheduler := worker.NewCleanupScheduler(linkService, cfg.Cleanup.Interval)
 
-	// 11. Initialize Handlers
+	// 12. Initialize Handlers
 	healthHandler := handler.NewHealthHandler(readyService, cfg.Server.Version, cfg.Server.GitCommit, cfg.Server.BuildTime, cfg.Server.Env)
 	linkHandler := handler.NewLinkHandler(linkService, workerPool)
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(authService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
-	// 12. Setup HTTP Router
+	// 13. Setup HTTP Router
 	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler)
 
-	// 13. Instantiate HTTP server wrapper
+	// 14. Instantiate HTTP server wrapper
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -128,6 +146,7 @@ func NewApplication() (*Application, error) {
 		httpServer:       server,
 		workerPool:       workerPool,
 		cleanupScheduler: cleanupScheduler,
+		auditLogger:      auditLogger,
 	}, nil
 }
 
@@ -167,31 +186,38 @@ func (a *Application) Run() error {
 		slog.Info("HTTP server stopped accepting new requests")
 	}
 
+	// 2. Close Async Audit Logger (drains all remaining logs)
+	if err := a.auditLogger.Close(ctx); err != nil {
+		slog.Error("Error closing audit logger gracefully", "error", err)
+	} else {
+		slog.Info("Audit logger closed successfully")
+	}
+
 	// Stop background cleanup ticker
 	a.cleanupScheduler.Stop()
 
-	// 2. Drain Worker Pool (waits for queued events to flush to PostgreSQL)
+	// 3. Drain Worker Pool (waits for queued events to flush to PostgreSQL)
 	if err := a.workerPool.Shutdown(ctx); err != nil {
 		slog.Error("Worker pool shutdown encountered an error", "error", err)
 	} else {
 		slog.Info("Worker pool gracefully drained and stopped")
 	}
 
-	// 3. Close Redis connections
+	// 4. Close Redis connections
 	if err := a.redis.Close(); err != nil {
 		slog.Error("Error closing Redis client connection", "error", err)
 	} else {
 		slog.Info("Redis connection client closed successfully")
 	}
 
-	// 4. Close PostgreSQL connections (after worker pool has completed GORM inserts)
+	// 5. Close PostgreSQL connections (after worker pool has completed GORM inserts)
 	if err := a.db.Close(); err != nil {
 		slog.Error("Error closing PostgreSQL connection pool", "error", err)
 	} else {
 		slog.Info("PostgreSQL connection pool closed successfully")
 	}
 
-	// 5. Flush Logger
+	// 6. Flush Logger
 	slog.Info("Graceful shutdown completed. Exiting safely.")
 	return nil
 }

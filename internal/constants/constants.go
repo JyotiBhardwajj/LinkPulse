@@ -14,6 +14,9 @@ const (
 	// AuthContextKey is the context key where the AuthContext struct is stored.
 	AuthContextKey ContextKey = "AuthContext"
 
+	// ClientIPKey is the context key where client IPs are stored.
+	ClientIPKey ContextKey = "ClientIP"
+
 	// DefaultShortCodeLength is the fallback length for slug generation.
 	DefaultShortCodeLength = 7
 

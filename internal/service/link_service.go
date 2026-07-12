@@ -11,6 +11,7 @@ import (
 	"linkpulse/internal/cache"
 	"linkpulse/internal/constants"
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/logger"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 	"linkpulse/internal/utils"
@@ -153,6 +154,8 @@ func (s *linkService) Create(ctx context.Context, req models.CreateLinkRequest, 
 	if err := s.linkRepo.Create(ctx, link); err != nil {
 		return nil, err
 	}
+
+	s.submitAudit(ctx, logger.EventLinkCreate, "links", link.ID.String(), userID)
 
 	return &models.LinkResponse{
 		ID:          link.ID,
@@ -410,6 +413,8 @@ func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID
 		return nil, err
 	}
 
+	s.submitAudit(ctx, logger.EventLinkUpdate, "links", link.ID.String(), &userID)
+
 	// Invalidate cache for the updated short code
 	_ = s.linkCache.DeleteLink(ctx, link.ShortCode)
 
@@ -441,7 +446,12 @@ func (s *linkService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID
 	// Invalidate cache immediately
 	_ = s.linkCache.DeleteLink(ctx, link.ShortCode)
 
-	return s.linkRepo.SoftDelete(ctx, id)
+	if err := s.linkRepo.SoftDelete(ctx, id); err != nil {
+		return err
+	}
+
+	s.submitAudit(ctx, logger.EventLinkDelete, "links", id.String(), &userID)
+	return nil
 }
 
 // DeactivateExpiredLinks executes GORM queries to batch deactivate links and invalidates cache entries.
@@ -462,4 +472,36 @@ func (s *linkService) DeactivateExpiredLinks(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+func (s *linkService) submitAudit(ctx context.Context, event logger.AuditEvent, resource string, resourceID string, userID *uuid.UUID) {
+	var uid uuid.UUID
+	if userID != nil {
+		uid = *userID
+	}
+	var reqID string
+	if val := ctx.Value(constants.RequestIDKey); val != nil {
+		if id, ok := val.(string); ok {
+			reqID = id
+		}
+	}
+	var ip string
+	if val := ctx.Value(constants.ClientIPKey); val != nil {
+		if clIP, ok := val.(string); ok {
+			ip = clIP
+		}
+	}
+	var ipHash string
+	if ip != "" {
+		ipHash = utils.HashIP(ip)
+	}
+
+	logger.GetAuditLogger().Submit(logger.AuditRecord{
+		RequestID:  reqID,
+		UserID:     uid,
+		Event:      event,
+		Resource:   resource,
+		ResourceID: resourceID,
+		IPHash:     ipHash,
+	})
 }

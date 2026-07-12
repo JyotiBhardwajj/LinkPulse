@@ -17,6 +17,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
+	Update(ctx context.Context, user *models.User) error
 }
 
 type userRepository struct {
@@ -61,4 +62,16 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models
 		return nil, err
 	}
 	return &user, nil
+}
+
+// Update saves modifications to a user record and asserts exactly one row was affected.
+func (r *userRepository) Update(ctx context.Context, user *models.User) error {
+	db := r.db.WithContext(ctx).Save(user)
+	if db.Error != nil {
+		return db.Error
+	}
+	if db.RowsAffected != 1 {
+		return domainErrors.ErrNotFound
+	}
+	return nil
 }

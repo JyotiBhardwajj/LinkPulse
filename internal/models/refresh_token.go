@@ -17,6 +17,8 @@ type RefreshToken struct {
 	UserAgent  string     `gorm:"type:text" json:"user_agent"`
 	LastUsedAt time.Time  `gorm:"type:timestamp with time zone;not null" json:"last_used_at"`
 	ExpiresAt  time.Time  `gorm:"type:timestamp with time zone;not null" json:"expires_at"`
+	CreatedIP  string     `gorm:"type:varchar(100)" json:"created_ip"`
 	CreatedAt  time.Time  `gorm:"type:timestamp with time zone;not null" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"type:timestamp with time zone;not null" json:"updated_at"`
 	RevokedAt  *time.Time `gorm:"type:timestamp with time zone" json:"revoked_at"`
 }

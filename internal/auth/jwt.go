@@ -6,17 +6,20 @@ import (
 	"fmt"
 	"time"
 
+	"linkpulse/internal/models"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
-// GenerateAccessToken signs a new JWT access token containing standard claims and a unique jti.
-func GenerateAccessToken(userID uuid.UUID, email string, secret string, ttl time.Duration, issuer string) (string, error) {
+// GenerateAccessToken signs a new JWT access token containing standard claims, role, and a unique jti.
+func GenerateAccessToken(userID uuid.UUID, email string, role models.Role, secret string, ttl time.Duration, issuer string) (string, error) {
 	jti := uuid.New().String()
 	now := time.Now()
 
 	claims := UserClaims{
 		Email: email,
+		Role:  role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			Issuer:    issuer,
