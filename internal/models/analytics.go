@@ -31,4 +31,3 @@ type AnalyticsQuery struct {
 	Interval  string
 	Limit     int
 }
-

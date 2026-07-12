@@ -13,9 +13,9 @@ import (
 )
 
 type mockAnalyticsRepo struct {
-	mu      sync.Mutex
-	clicks  []*models.Analytics
-	panics  bool
+	mu        sync.Mutex
+	clicks    []*models.Analytics
+	panics    bool
 	blockChan chan struct{}
 }
 

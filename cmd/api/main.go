@@ -2,8 +2,8 @@
 package main
 
 import (
-	"log"
 	"linkpulse/internal/app"
+	"log"
 )
 
 func main() {

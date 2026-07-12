@@ -49,4 +49,3 @@ func (m *repositoryManager) Analytics() AnalyticsRepository {
 func (m *repositoryManager) RefreshTokens() RefreshTokenRepository {
 	return m.refreshRepo
 }
-

@@ -22,6 +22,6 @@ func NewNoOpMetrics() Metrics {
 	return &noOpMetrics{}
 }
 
-func (m *noOpMetrics) RecordLinkCreated()                           {}
-func (m *noOpMetrics) RecordLinkResolved()                          {}
+func (m *noOpMetrics) RecordLinkCreated()                                  {}
+func (m *noOpMetrics) RecordLinkResolved()                                 {}
 func (m *noOpMetrics) RecordRequestDuration(string, string, time.Duration) {}
