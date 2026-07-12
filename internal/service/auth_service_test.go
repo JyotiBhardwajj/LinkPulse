@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 	"linkpulse/internal/utils"
@@ -166,7 +167,7 @@ func TestAuthService_Lifecycle(t *testing.T) {
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	t.Run("User Registration succeeds", func(t *testing.T) {

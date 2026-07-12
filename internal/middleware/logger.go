@@ -15,6 +15,11 @@ func Logger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 
+		if path == "/metrics" {
+			c.Next()
+			return
+		}
+
 		c.Next()
 
 		latencyMS := time.Since(start).Milliseconds()

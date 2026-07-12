@@ -11,6 +11,7 @@ import (
 	"time"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
@@ -185,7 +186,7 @@ func TestAuthHandler_Integration(t *testing.T) {
 	accessTTL := 5 * time.Minute
 	refreshTTL := 24 * time.Hour
 
-	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	mockUS := &mockUserService{userRepo: userRepo}
 
 	// Handlers

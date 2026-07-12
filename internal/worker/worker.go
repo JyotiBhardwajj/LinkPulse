@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 
@@ -21,7 +22,7 @@ type ClickEvent struct {
 }
 
 // processEvent maps ClickEvent to GORM Analytics model, validates properties, and persists to Postgres database.
-func processEvent(ctx context.Context, repo repository.AnalyticsRepository, event ClickEvent) error {
+func processEvent(ctx context.Context, repo repository.AnalyticsRepository, event ClickEvent, tracker metrics.Metrics) error {
 	if event.LinkID == uuid.Nil {
 		slog.Warn("Skipping event processing: LinkID is nil")
 		return nil
@@ -50,8 +51,10 @@ func processEvent(ctx context.Context, repo repository.AnalyticsRepository, even
 			"link_id", event.LinkID.String(),
 			"error", err.Error(),
 		)
+		tracker.RecordAnalyticsError()
 		return err
 	}
 
+	tracker.RecordAnalyticsWrite()
 	return nil
 }

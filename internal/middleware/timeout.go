@@ -21,6 +21,11 @@ func Timeout(timeout time.Duration) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		if c.Request.URL.Path == "/metrics" {
+			c.Next()
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 		defer cancel()
 

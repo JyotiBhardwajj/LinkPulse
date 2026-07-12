@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"linkpulse/internal/config"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 
 	"github.com/google/uuid"
@@ -26,7 +27,7 @@ func TestLinkCache_Integration(t *testing.T) {
 	defer func() { _ = redisClient.Close() }()
 
 	ctx := context.Background()
-	cache := NewLinkCache(redisClient, "test-link:")
+	cache := NewLinkCache(redisClient, "test-link:", metrics.NewNoOpMetrics())
 
 	shortCode := "test-code-" + uuid.New().String()[:8]
 	cachedLink := &models.CachedLink{

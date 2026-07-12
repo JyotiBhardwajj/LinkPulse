@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 
 	"github.com/google/uuid"
@@ -217,7 +218,7 @@ func TestLinkService_CreateAndResolve(t *testing.T) {
 	analyticsRepo := &mockAnalyticsRepo{}
 	linkCache := &mockLinkCache{store: make(map[string]*models.CachedLink)}
 	baseURL := "https://linkpulse.com"
-	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
+	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour, metrics.NewNoOpMetrics())
 
 	ctx := context.Background()
 	userID := uuid.New()
@@ -310,7 +311,7 @@ func TestLinkService_Management(t *testing.T) {
 	analyticsRepo := &mockAnalyticsRepo{}
 	linkCache := &mockLinkCache{store: make(map[string]*models.CachedLink)}
 	baseURL := "https://linkpulse.com"
-	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
+	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour, metrics.NewNoOpMetrics())
 
 	ctx := context.Background()
 	userA := uuid.New()

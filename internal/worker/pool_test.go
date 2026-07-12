@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 
 	"github.com/google/uuid"
@@ -56,7 +57,7 @@ func (m *mockAnalyticsRepo) GetTopLinks(ctx context.Context, userID uuid.UUID, l
 
 func TestWorkerPool_Processing(t *testing.T) {
 	repo := &mockAnalyticsRepo{}
-	pool := NewWorkerPool(repo, 3, 10)
+	pool := NewWorkerPool(repo, 3, 10, metrics.NewNoOpMetrics())
 	pool.Start(context.Background())
 	defer func() { _ = pool.Shutdown(context.Background()) }()
 
@@ -88,7 +89,7 @@ func TestWorkerPool_Processing(t *testing.T) {
 
 func TestWorkerPool_PanicRecovery(t *testing.T) {
 	repo := &mockAnalyticsRepo{panics: true}
-	pool := NewWorkerPool(repo, 1, 10)
+	pool := NewWorkerPool(repo, 1, 10, metrics.NewNoOpMetrics())
 	pool.Start(context.Background())
 	defer func() { _ = pool.Shutdown(context.Background()) }()
 
@@ -114,7 +115,7 @@ func TestWorkerPool_QueueOverflow(t *testing.T) {
 	repo := &mockAnalyticsRepo{blockChan: block}
 
 	// 1 worker, queue capacity 2
-	pool := NewWorkerPool(repo, 1, 2)
+	pool := NewWorkerPool(repo, 1, 2, metrics.NewNoOpMetrics())
 	pool.Start(context.Background())
 
 	ctx := context.Background()

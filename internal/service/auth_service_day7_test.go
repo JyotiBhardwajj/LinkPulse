@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 
@@ -23,7 +24,7 @@ func TestAuthService_SessionPruningAndPruningOrder(t *testing.T) {
 	refreshTTL := 7 * 24 * time.Hour
 
 	// Limit to max 3 sessions
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 3)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 3, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	// Register user
@@ -89,7 +90,7 @@ func TestAuthService_RolePromotionAndDemotion(t *testing.T) {
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	// Register user
@@ -129,7 +130,7 @@ func TestAuthService_LogoutAll(t *testing.T) {
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	// Register user
@@ -166,7 +167,7 @@ func TestAuthService_CurrentSessionDetection(t *testing.T) {
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	// Register and login
@@ -239,7 +240,7 @@ func TestAuthService_TransactionRollback(t *testing.T) {
 	accessTTL := 15 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
+	service := NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
 	ctx := context.Background()
 
 	// Register user

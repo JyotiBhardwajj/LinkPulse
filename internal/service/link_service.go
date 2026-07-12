@@ -12,6 +12,7 @@ import (
 	"linkpulse/internal/constants"
 	domainErrors "linkpulse/internal/errors"
 	"linkpulse/internal/logger"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 	"linkpulse/internal/utils"
@@ -42,6 +43,7 @@ type linkService struct {
 	baseURL              string
 	cacheTTL             time.Duration
 	singleflightGroup    singleflight.Group
+	metrics              metrics.Metrics
 }
 
 // NewLinkService instantiates a new LinkService implementation.
@@ -53,6 +55,7 @@ func NewLinkService(
 	maxGenerationRetries int,
 	baseURL string,
 	cacheTTL time.Duration,
+	metricsTracker metrics.Metrics,
 ) LinkService {
 	if shortCodeLength <= 0 {
 		shortCodeLength = 7
@@ -71,6 +74,7 @@ func NewLinkService(
 		maxGenerationRetries: maxGenerationRetries,
 		baseURL:              baseURL,
 		cacheTTL:             cacheTTL,
+		metrics:              metricsTracker,
 	}
 }
 
@@ -154,6 +158,8 @@ func (s *linkService) Create(ctx context.Context, req models.CreateLinkRequest, 
 	if err := s.linkRepo.Create(ctx, link); err != nil {
 		return nil, err
 	}
+
+	s.metrics.RecordLinkCreated()
 
 	s.submitAudit(ctx, logger.EventLinkCreate, "links", link.ID.String(), userID)
 
@@ -250,6 +256,7 @@ func (s *linkService) Resolve(ctx context.Context, code string) (*models.CachedL
 		return nil, fmt.Errorf("%w: failed to cast cache result", domainErrors.ErrInternal)
 	}
 
+	s.metrics.RecordLinkResolved()
 	return cachedLink, nil
 }
 
@@ -413,6 +420,8 @@ func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID
 		return nil, err
 	}
 
+	s.metrics.RecordLinkUpdated()
+
 	s.submitAudit(ctx, logger.EventLinkUpdate, "links", link.ID.String(), &userID)
 
 	// Invalidate cache for the updated short code
@@ -449,6 +458,8 @@ func (s *linkService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID
 	if err := s.linkRepo.SoftDelete(ctx, id); err != nil {
 		return err
 	}
+
+	s.metrics.RecordLinkDeleted()
 
 	s.submitAudit(ctx, logger.EventLinkDelete, "links", id.String(), &userID)
 	return nil

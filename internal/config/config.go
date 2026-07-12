@@ -64,6 +64,13 @@ type JWTConfig struct {
 	MaxSessionsPerUser int           `mapstructure:"MAX_SESSIONS_PER_USER"`
 }
 
+// MetricsConfig stores settings related to Prometheus metrics collection.
+type MetricsConfig struct {
+	EnableMetrics    bool   `mapstructure:"ENABLE_METRICS"`
+	MetricsNamespace string `mapstructure:"METRICS_NAMESPACE"`
+	MetricsSubsystem string `mapstructure:"METRICS_SUBSYSTEM"`
+}
+
 // Config is the top-level configuration container for LinkPulse.
 type Config struct {
 	Server   ServerConfig   `mapstructure:",squash"`
@@ -73,6 +80,7 @@ type Config struct {
 	JWT      JWTConfig      `mapstructure:",squash"`
 	Worker   WorkerConfig   `mapstructure:",squash"`
 	Cleanup  CleanupConfig  `mapstructure:",squash"`
+	Metrics  MetricsConfig  `mapstructure:",squash"`
 	LogLevel string         `mapstructure:"LOG_LEVEL"`
 }
 
@@ -123,6 +131,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("MAX_SESSIONS_PER_USER must be greater than 0")
 	}
 
+	if c.Metrics.EnableMetrics {
+		if c.Metrics.MetricsNamespace == "" {
+			return fmt.Errorf("METRICS_NAMESPACE cannot be empty when ENABLE_METRICS is true")
+		}
+		if c.Metrics.MetricsSubsystem == "" {
+			return fmt.Errorf("METRICS_SUBSYSTEM cannot be empty when ENABLE_METRICS is true")
+		}
+	}
+
 	return nil
 }
 
@@ -161,6 +178,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("BUILD_VERSION", "1.0.0")
 	viper.SetDefault("GIT_COMMIT", "unknown")
 	viper.SetDefault("BUILD_TIME", "unknown")
+	viper.SetDefault("ENABLE_METRICS", true)
+	viper.SetDefault("METRICS_NAMESPACE", "linkpulse")
+	viper.SetDefault("METRICS_SUBSYSTEM", "api")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env is missing in production since environment variables may be injected directly.

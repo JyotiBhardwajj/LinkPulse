@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"linkpulse/internal/handler"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 
@@ -22,6 +23,7 @@ func SetupRouter(
 	userHandler *handler.UserHandler,
 	authHandler *handler.AuthHandler,
 	analyticsHandler *handler.AnalyticsHandler,
+	metricsTracker metrics.Metrics,
 ) *gin.Engine {
 	// Disable Gin default logging to use our structured slog middleware
 	gin.SetMode(gin.ReleaseMode)
@@ -30,6 +32,9 @@ func SetupRouter(
 	// Apply Middlewares in correct order
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recovery())
+	if metricsTracker != nil {
+		r.Use(middleware.MetricsMiddleware(metricsTracker))
+	}
 	r.Use(middleware.Logger())
 	r.Use(middleware.Timeout(timeoutDuration))
 	r.Use(middleware.CORS())
@@ -38,6 +43,12 @@ func SetupRouter(
 	// Diagnostic Endpoints
 	r.GET("/health", healthHandler.Check)
 	r.GET("/ready", healthHandler.CheckReady)
+
+	if metricsTracker != nil {
+		if exposer, ok := metricsTracker.(interface{ HTTPHandler() http.Handler }); ok {
+			r.GET("/metrics", gin.WrapH(exposer.HTTPHandler()))
+		}
+	}
 
 	// Redirect Endpoint (Optimized path)
 	r.GET("/r/:code", linkHandler.Resolve)

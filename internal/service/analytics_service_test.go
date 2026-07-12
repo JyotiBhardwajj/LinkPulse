@@ -8,6 +8,7 @@ import (
 
 	"linkpulse/internal/constants"
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 
 	"github.com/google/uuid"
@@ -60,7 +61,7 @@ func TestAnalyticsService_Overview(t *testing.T) {
 	}
 	linkRepo := newMockLinkRepo()
 
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 	res, err := srv.GetOverview(context.Background(), models.AnalyticsQuery{UserID: uuid.New()})
 
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func TestAnalyticsService_ZeroFilling(t *testing.T) {
 	}
 
 	repo := &mockAnalyticsRepoForService{clicks: dbMetrics}
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 
 	q := models.AnalyticsQuery{
 		UserID:    uuid.New(),
@@ -111,7 +112,7 @@ func TestAnalyticsService_ZeroFilling(t *testing.T) {
 func TestAnalyticsService_IntervalValidation(t *testing.T) {
 	repo := &mockAnalyticsRepoForService{}
 	linkRepo := newMockLinkRepo()
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 
 	q := models.AnalyticsQuery{
 		UserID:    uuid.New(),
@@ -133,7 +134,7 @@ func TestAnalyticsService_PercentageCalculation(t *testing.T) {
 		},
 	}
 	linkRepo := newMockLinkRepo()
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 
 	q := models.AnalyticsQuery{
 		UserID:    uuid.New(),
@@ -160,7 +161,7 @@ func TestAnalyticsService_PercentageCalculation(t *testing.T) {
 func TestAnalyticsService_LimitClamping(t *testing.T) {
 	repo := &mockAnalyticsRepoForService{}
 	linkRepo := newMockLinkRepo()
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 
 	q := models.AnalyticsQuery{
 		UserID: uuid.New(),
@@ -176,7 +177,7 @@ func TestAnalyticsService_LimitClamping(t *testing.T) {
 func TestAnalyticsService_OwnershipValidation(t *testing.T) {
 	linkRepo := newMockLinkRepo()
 	repo := &mockAnalyticsRepoForService{}
-	srv := NewAnalyticsService(repo, linkRepo)
+	srv := NewAnalyticsService(repo, linkRepo, metrics.NewNoOpMetrics())
 
 	userID := uuid.New()
 	otherUserID := uuid.New()

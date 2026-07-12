@@ -12,6 +12,7 @@ import (
 	"linkpulse/internal/constants"
 	domainErrors "linkpulse/internal/errors"
 	"linkpulse/internal/logger"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 	"linkpulse/internal/utils"
@@ -45,6 +46,7 @@ type authService struct {
 	refreshTokenTTL    time.Duration
 	tokenIssuer        string
 	maxSessionsPerUser int
+	metrics            metrics.Metrics
 }
 
 // NewAuthService instantiates a new AuthService implementation.
@@ -57,6 +59,7 @@ func NewAuthService(
 	refreshTokenTTL time.Duration,
 	tokenIssuer string,
 	maxSessionsPerUser int,
+	metricsTracker metrics.Metrics,
 ) AuthService {
 	if maxSessionsPerUser <= 0 {
 		maxSessionsPerUser = 10
@@ -70,6 +73,7 @@ func NewAuthService(
 		refreshTokenTTL:    refreshTokenTTL,
 		tokenIssuer:        tokenIssuer,
 		maxSessionsPerUser: maxSessionsPerUser,
+		metrics:            metricsTracker,
 	}
 }
 
@@ -128,6 +132,7 @@ func (s *authService) Login(ctx context.Context, email string, password string, 
 
 	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
+		s.metrics.RecordLoginFailure()
 		if errors.Is(err, domainErrors.ErrNotFound) {
 			return nil, genericErr
 		}
@@ -135,6 +140,7 @@ func (s *authService) Login(ctx context.Context, email string, password string, 
 	}
 
 	if !utils.ComparePassword(password, user.PasswordHash) {
+		s.metrics.RecordLoginFailure()
 		return nil, genericErr
 	}
 
@@ -189,8 +195,11 @@ func (s *authService) Login(ctx context.Context, email string, password string, 
 	})
 
 	if err != nil {
+		s.metrics.RecordLoginFailure()
 		return nil, err
 	}
+
+	s.metrics.RecordLoginSuccess()
 
 	reqID, ipHash := getAuditMetadata(ctx)
 	logger.GetAuditLogger().Submit(logger.AuditRecord{
@@ -277,8 +286,11 @@ func (s *authService) Refresh(ctx context.Context, refreshToken string, ip strin
 	})
 
 	if err != nil {
+		s.metrics.RecordRefreshFailure()
 		return nil, err
 	}
+
+	s.metrics.RecordRefreshSuccess()
 
 	reqID, ipHash := getAuditMetadata(ctx)
 	logger.GetAuditLogger().Submit(logger.AuditRecord{
@@ -323,6 +335,7 @@ func (s *authService) LogoutCurrentDevice(ctx context.Context, refreshToken stri
 		IPHash:     ipHash,
 	})
 
+	s.metrics.RecordLogout()
 	return nil
 }
 
@@ -411,6 +424,7 @@ func (s *authService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
 		IPHash:     ipHash,
 	})
 
+	s.metrics.RecordLogout()
 	return nil
 }
 

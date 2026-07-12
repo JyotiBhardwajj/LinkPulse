@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 
 	"github.com/redis/go-redis/v9"
@@ -31,13 +32,15 @@ type LinkCache interface {
 type linkCache struct {
 	redisClient *RedisClient
 	prefix      string
+	metrics     metrics.Metrics
 }
 
 // NewLinkCache instantiates a LinkCache implementation backed by Redis.
-func NewLinkCache(redisClient *RedisClient, prefix string) LinkCache {
+func NewLinkCache(redisClient *RedisClient, prefix string, metrics metrics.Metrics) LinkCache {
 	return &linkCache{
 		redisClient: redisClient,
 		prefix:      prefix,
+		metrics:     metrics,
 	}
 }
 
@@ -57,6 +60,7 @@ func (c *linkCache) GetLink(ctx context.Context, shortCode string) (*models.Cach
 				"duration_ms", float64(duration.Microseconds())/1000.0,
 				"status", "miss",
 			)
+			c.metrics.RecordCacheMiss()
 			return nil, nil // Return nil, nil on cache miss
 		}
 
@@ -67,6 +71,7 @@ func (c *linkCache) GetLink(ctx context.Context, shortCode string) (*models.Cach
 			"status", "error",
 			"error", err.Error(),
 		)
+		c.metrics.RecordCacheError()
 		return nil, err
 	}
 
@@ -79,6 +84,7 @@ func (c *linkCache) GetLink(ctx context.Context, shortCode string) (*models.Cach
 			"status", "error",
 			"error", err.Error(),
 		)
+		c.metrics.RecordCacheError()
 		return nil, err
 	}
 
@@ -88,6 +94,7 @@ func (c *linkCache) GetLink(ctx context.Context, shortCode string) (*models.Cach
 		"duration_ms", float64(duration.Microseconds())/1000.0,
 		"status", "hit",
 	)
+	c.metrics.RecordCacheHit()
 	return &cachedLink, nil
 }
 
@@ -105,6 +112,7 @@ func (c *linkCache) SetLink(ctx context.Context, shortCode string, link *models.
 			"status", "error",
 			"error", err.Error(),
 		)
+		c.metrics.RecordCacheError()
 		return err
 	}
 
@@ -119,6 +127,7 @@ func (c *linkCache) SetLink(ctx context.Context, shortCode string, link *models.
 			"status", "error",
 			"error", err.Error(),
 		)
+		c.metrics.RecordCacheError()
 		return err
 	}
 
@@ -147,6 +156,7 @@ func (c *linkCache) DeleteLink(ctx context.Context, shortCode string) error {
 			"status", "error",
 			"error", err.Error(),
 		)
+		c.metrics.RecordCacheError()
 		return err
 	}
 
@@ -164,6 +174,7 @@ func (c *linkCache) Exists(ctx context.Context, shortCode string) (bool, error) 
 	key := c.prefix + shortCode
 	count, err := c.redisClient.Client.Exists(ctx, key).Result()
 	if err != nil {
+		c.metrics.RecordCacheError()
 		return false, err
 	}
 	return count > 0, nil

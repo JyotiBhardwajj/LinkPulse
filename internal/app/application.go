@@ -17,6 +17,7 @@ import (
 	"linkpulse/internal/database"
 	"linkpulse/internal/handler"
 	"linkpulse/internal/logger"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/repository"
 	"linkpulse/internal/routes"
 	"linkpulse/internal/service"
@@ -75,15 +76,37 @@ func NewApplication() (*Application, error) {
 		return nil, fmt.Errorf("redis error: %w", err)
 	}
 
+	// Initialize metrics
+	var metricsTracker metrics.Metrics
+	if cfg.Metrics.EnableMetrics {
+		var registry interface{}
+		metricsTracker, registry = metrics.GetProductionMetrics(cfg.Metrics.MetricsNamespace, cfg.Metrics.MetricsSubsystem)
+		if registry == nil {
+			slog.Warn("Failed to initialize production metrics registry, falling back to NoOp")
+			metricsTracker = metrics.NewNoOpMetrics()
+		} else {
+			slog.Info("Successfully initialized Prometheus metrics")
+			// Register GORM metrics plugin
+			err = db.DB.Use(database.NewMetricsPlugin(metricsTracker))
+			if err != nil {
+				slog.Error("Failed to register GORM metrics plugin", "error", err)
+			} else {
+				slog.Info("Successfully registered GORM metrics plugin")
+			}
+		}
+	} else {
+		metricsTracker = metrics.NewNoOpMetrics()
+	}
+
 	// 7. Initialize LinkCache (using prefix namespacing)
-	linkCache := cache.NewLinkCache(redisClient, cfg.Cache.Prefix)
+	linkCache := cache.NewLinkCache(redisClient, cfg.Cache.Prefix, metricsTracker)
 
 	// 8. Initialize Repositories (RepositoryManager) and TransactionManager
 	repoMgr := repository.NewRepositoryManager(db.DB)
 	txMgr := repository.NewTransactionManager(db.DB)
 
 	// 9. Initialize WorkerPool
-	workerPool := worker.NewWorkerPool(repoMgr.Analytics(), cfg.Worker.Count, cfg.Worker.QueueSize)
+	workerPool := worker.NewWorkerPool(repoMgr.Analytics(), cfg.Worker.Count, cfg.Worker.QueueSize, metricsTracker)
 
 	// 10. Initialize Services
 	userService := service.NewUserService(repoMgr.Users())
@@ -95,6 +118,7 @@ func NewApplication() (*Application, error) {
 		cfg.Server.MaxGenerationRetries,
 		cfg.Server.BaseURL,
 		cfg.Cache.TTL,
+		metricsTracker,
 	)
 	authService := service.NewAuthService(
 		repoMgr.Users(),
@@ -105,8 +129,9 @@ func NewApplication() (*Application, error) {
 		cfg.JWT.RefreshTokenTTL,
 		cfg.JWT.Issuer,
 		cfg.JWT.MaxSessionsPerUser,
+		metricsTracker,
 	)
-	analyticsService := service.NewAnalyticsService(repoMgr.Analytics(), repoMgr.Links())
+	analyticsService := service.NewAnalyticsService(repoMgr.Analytics(), repoMgr.Links(), metricsTracker)
 
 	// Initialize ReadinessService with parallel checker map
 	checkers := map[string]service.ReadinessChecker{
@@ -127,7 +152,7 @@ func NewApplication() (*Application, error) {
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	// 13. Setup HTTP Router
-	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler)
+	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler, metricsTracker)
 
 	// 14. Instantiate HTTP server wrapper
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)

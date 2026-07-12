@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/repository"
 )
 
@@ -37,10 +38,11 @@ type workerPool struct {
 	started       bool
 	stopped       bool
 	mu            sync.Mutex
+	metrics       metrics.Metrics
 }
 
 // NewWorkerPool instantiates a WorkerPool implementation.
-func NewWorkerPool(analyticsRepo repository.AnalyticsRepository, workerCount, queueSize int) WorkerPool {
+func NewWorkerPool(analyticsRepo repository.AnalyticsRepository, workerCount, queueSize int, metricsTracker metrics.Metrics) WorkerPool {
 	if workerCount <= 0 {
 		workerCount = 5
 	}
@@ -53,6 +55,7 @@ func NewWorkerPool(analyticsRepo repository.AnalyticsRepository, workerCount, qu
 		queueSize:     queueSize,
 		queue:         make(chan ClickEvent, queueSize),
 		stopChan:      make(chan struct{}),
+		metrics:       metricsTracker,
 	}
 }
 
@@ -63,6 +66,10 @@ func (p *workerPool) Start(ctx context.Context) {
 		p.started = true
 		p.mu.Unlock()
 		slog.Info("Starting worker pool", "workers", p.workerCount, "queue_size", p.queueSize)
+
+		p.metrics.RecordWorkerActive(p.workerCount)
+		p.metrics.RecordWorkerQueueSize(0)
+
 		for i := 0; i < p.workerCount; i++ {
 			p.wg.Add(1)
 			go p.workerLoop(ctx, i)
@@ -81,6 +88,7 @@ func (p *workerPool) Submit(ctx context.Context, event ClickEvent) error {
 
 	select {
 	case p.queue <- event:
+		p.metrics.RecordWorkerQueueSize(len(p.queue))
 		return nil
 	default:
 		// Bounded channel overflow non-blocking policy
@@ -88,6 +96,7 @@ func (p *workerPool) Submit(ctx context.Context, event ClickEvent) error {
 			"link_id", event.LinkID,
 			"timestamp", event.Timestamp,
 		)
+		p.metrics.RecordWorkerDropped()
 		return nil
 	}
 }
@@ -101,6 +110,9 @@ func (p *workerPool) Shutdown(ctx context.Context) error {
 		close(p.stopChan)
 		close(p.queue)
 		p.mu.Unlock()
+
+		p.metrics.RecordWorkerActive(0)
+		p.metrics.RecordWorkerQueueSize(0)
 
 		slog.Info("Shutting down worker pool gracefully")
 
@@ -143,14 +155,18 @@ func (p *workerPool) workerLoop(ctx context.Context, workerID int) {
 		case <-p.stopChan:
 			// Draining remaining items in channel after close
 			for event := range p.queue {
+				p.metrics.RecordWorkerQueueSize(len(p.queue))
 				p.safeProcess(ctx, event)
+				p.metrics.RecordWorkerProcessed()
 			}
 			return
 		case event, ok := <-p.queue:
 			if !ok {
 				return
 			}
+			p.metrics.RecordWorkerQueueSize(len(p.queue))
 			p.safeProcess(ctx, event)
+			p.metrics.RecordWorkerProcessed()
 		}
 	}
 }
@@ -165,5 +181,5 @@ func (p *workerPool) safeProcess(ctx context.Context, event ClickEvent) {
 		}
 	}()
 
-	_ = processEvent(ctx, p.analyticsRepo, event)
+	_ = processEvent(ctx, p.analyticsRepo, event, p.metrics)
 }

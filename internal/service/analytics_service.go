@@ -7,6 +7,7 @@ import (
 
 	"linkpulse/internal/constants"
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
 
@@ -27,13 +28,15 @@ type AnalyticsService interface {
 type analyticsService struct {
 	analyticsRepo repository.AnalyticsRepository
 	linkRepo      repository.LinkRepository
+	metrics       metrics.Metrics
 }
 
 // NewAnalyticsService instantiates a new AnalyticsService implementation.
-func NewAnalyticsService(analyticsRepo repository.AnalyticsRepository, linkRepo repository.LinkRepository) AnalyticsService {
+func NewAnalyticsService(analyticsRepo repository.AnalyticsRepository, linkRepo repository.LinkRepository, metricsTracker metrics.Metrics) AnalyticsService {
 	return &analyticsService{
 		analyticsRepo: analyticsRepo,
 		linkRepo:      linkRepo,
+		metrics:       metricsTracker,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"linkpulse/internal/auth"
 	domainErrors "linkpulse/internal/errors"
+	"linkpulse/internal/metrics"
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/repository"
@@ -220,8 +221,8 @@ func TestLinkHandler_Integration(t *testing.T) {
 	refreshTTL := 24 * time.Hour
 	baseURL := "http://localhost:8080"
 
-	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10)
-	linkService := service.NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
+	authService := service.NewAuthService(userRepo, refreshRepo, txMgr, secret, accessTTL, refreshTTL, issuer, 10, metrics.NewNoOpMetrics())
+	linkService := service.NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour, metrics.NewNoOpMetrics())
 	workerPool := &localWorkerPool{}
 
 	linkHandler := NewLinkHandler(linkService, workerPool)
