@@ -55,26 +55,35 @@ type asyncAuditLogger struct {
 	mu        sync.Mutex
 }
 
-var globalAuditLogger AsyncAuditLogger
+var (
+	globalAuditLogger AsyncAuditLogger
+	auditLoggerMu     sync.RWMutex
+)
 
 // InitAuditLogger instantiates the global audit logger worker.
 func InitAuditLogger(queueSize int) AsyncAuditLogger {
 	if queueSize <= 0 {
 		queueSize = 1000
 	}
+	auditLoggerMu.Lock()
 	globalAuditLogger = &asyncAuditLogger{
 		queue:    make(chan AuditRecord, queueSize),
 		stopChan: make(chan struct{}),
 	}
-	return globalAuditLogger
+	logger := globalAuditLogger
+	auditLoggerMu.Unlock()
+	return logger
 }
 
 // GetAuditLogger returns the global initialized audit logger instance, falling back to a no-op implementation if uninitialized.
 func GetAuditLogger() AsyncAuditLogger {
-	if globalAuditLogger == nil {
+	auditLoggerMu.RLock()
+	logger := globalAuditLogger
+	auditLoggerMu.RUnlock()
+	if logger == nil {
 		return &noopAuditLogger{}
 	}
-	return globalAuditLogger
+	return logger
 }
 
 type noopAuditLogger struct{}
