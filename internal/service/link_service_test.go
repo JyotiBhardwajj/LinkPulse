@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -176,10 +177,13 @@ func (m *mockAnalyticsRepo) GetTopLinks(ctx context.Context, userID uuid.UUID, l
 
 // Simple in-memory mock LinkCache
 type mockLinkCache struct {
+	mu    sync.RWMutex
 	store map[string]*models.CachedLink
 }
 
 func (m *mockLinkCache) GetLink(ctx context.Context, code string) (*models.CachedLink, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	val, exists := m.store[code]
 	if !exists {
 		return nil, nil
@@ -188,16 +192,22 @@ func (m *mockLinkCache) GetLink(ctx context.Context, code string) (*models.Cache
 }
 
 func (m *mockLinkCache) SetLink(ctx context.Context, code string, link *models.CachedLink, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.store[code] = link
 	return nil
 }
 
 func (m *mockLinkCache) DeleteLink(ctx context.Context, code string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	delete(m.store, code)
 	return nil
 }
 
 func (m *mockLinkCache) Exists(ctx context.Context, code string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	_, exists := m.store[code]
 	return exists, nil
 }

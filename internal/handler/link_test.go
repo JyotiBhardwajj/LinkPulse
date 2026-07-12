@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,21 +130,30 @@ func (m *localAnalyticsRepo) GetTopLinks(ctx context.Context, userID uuid.UUID, 
 }
 
 type localLinkCache struct {
+	mu    sync.RWMutex
 	store map[string]*models.CachedLink
 }
 
 func (m *localLinkCache) GetLink(ctx context.Context, code string) (*models.CachedLink, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.store[code], nil
 }
 func (m *localLinkCache) SetLink(ctx context.Context, code string, link *models.CachedLink, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.store[code] = link
 	return nil
 }
 func (m *localLinkCache) DeleteLink(ctx context.Context, code string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	delete(m.store, code)
 	return nil
 }
 func (m *localLinkCache) Exists(ctx context.Context, code string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	_, ok := m.store[code]
 	return ok, nil
 }
