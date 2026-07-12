@@ -2,7 +2,6 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"linkpulse/internal/models"
 	"linkpulse/internal/service"
 	"linkpulse/internal/utils"
+	"linkpulse/internal/worker"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,11 +19,15 @@ import (
 // LinkHandler controllers HTTP operations on links.
 type LinkHandler struct {
 	linkService service.LinkService
+	workerPool  worker.WorkerPool
 }
 
 // NewLinkHandler creates a new LinkHandler instance.
-func NewLinkHandler(linkService service.LinkService) *LinkHandler {
-	return &LinkHandler{linkService: linkService}
+func NewLinkHandler(linkService service.LinkService, workerPool worker.WorkerPool) *LinkHandler {
+	return &LinkHandler{
+		linkService: linkService,
+		workerPool:  workerPool,
+	}
 }
 
 // Create binds request payload and creates a shortened mapping.
@@ -51,6 +55,7 @@ func (h *LinkHandler) Create(c *gin.Context) {
 }
 
 // Resolve processes short code lookup and issues 302 HTTP redirection.
+// Offloads click metrics tracking asynchronously using the background worker pool.
 func (h *LinkHandler) Resolve(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
@@ -58,7 +63,7 @@ func (h *LinkHandler) Resolve(c *gin.Context) {
 		return
 	}
 
-	originalURL, err := h.linkService.Resolve(c.Request.Context(), code)
+	cached, err := h.linkService.Resolve(c.Request.Context(), code)
 	if err != nil {
 		status := domainErrors.MapToHTTPStatus(err)
 		utils.SendError(c, status, err.Error(), "RESOLVE_FAILED")
@@ -66,30 +71,24 @@ func (h *LinkHandler) Resolve(c *gin.Context) {
 	}
 
 	// HTTP redirect (302 Found) executed strictly inside HTTP handler layer
-	c.Redirect(http.StatusFound, originalURL)
+	c.Redirect(http.StatusFound, cached.OriginalURL)
 
-	// Asynchronous metrics analytics logging stub
+	// Asynchronous metrics analytics logging offloaded to WorkerPool queue
 	clientIP := c.ClientIP()
 	ipHash := utils.HashIP(clientIP)
 	userAgent := c.Request.UserAgent()
 	referrer := c.GetHeader("Referer")
 
-	clickDetails := models.ClickDetails{
-		IPHash:    ipHash,
-		UserAgent: userAgent,
-		Referrer:  referrer,
-		Country:   "Unknown",
-		City:      "Unknown",
-		Browser:   "Unknown",
-		OS:        "Unknown",
-		Device:    "Unknown",
+	event := worker.ClickEvent{
+		LinkID:        cached.ID,
+		Timestamp:     time.Now(),
+		UserAgent:     userAgent,
+		Referrer:      referrer,
+		IPAddressHash: ipHash,
 	}
 
-	go func(shortCode string, details models.ClickDetails) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = h.linkService.RecordClick(ctx, shortCode, details)
-	}(code, clickDetails)
+	// Submit asynchronously. Never blocks redirect execution thread.
+	_ = h.workerPool.Submit(c.Request.Context(), event)
 }
 
 // Get retrieves details of a specific link owned by the user.

@@ -69,11 +69,16 @@ Creates a shortened link code mapping to the original target.
 
 ### Redirect Link
 Resolves a shortened link code and redirects to the original URL.
-
+- **Performance Layer Design**: 
+  - Resolves links utilizing a Redis Cache-Aside pattern (singleflight protected against concurrent database stampedes).
+  - Fires click metrics tracking events asynchronously to a background Go worker pool channel buffer (non-blocking drop policy).
+  
 - **URL**: `/r/:code`
 - **Method**: `GET`
 - **Headers**: None
 - **Response**: `302 Found` (Redirects to target location)
+  - Expired links return `410 Gone`.
+  - Deactivated or missing links return `404 Not Found`.
 
 ---
 

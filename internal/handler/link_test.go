@@ -14,6 +14,7 @@ import (
 	"linkpulse/internal/middleware"
 	"linkpulse/internal/models"
 	"linkpulse/internal/service"
+	"linkpulse/internal/worker"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -91,6 +92,9 @@ func (m *localLinkRepo) ExistsAlias(ctx context.Context, alias string) (bool, er
 	}
 	return false, nil
 }
+func (m *localLinkRepo) DeactivateExpiredLinks(ctx context.Context) ([]models.Link, error) {
+	return nil, nil
+}
 
 type localAnalyticsRepo struct{}
 
@@ -105,11 +109,35 @@ func (m *localAnalyticsRepo) GetClicksOverTime(ctx context.Context, linkID uuid.
 	return nil, nil
 }
 
-type localLinkCache struct{}
+type localLinkCache struct {
+	store map[string]*models.CachedLink
+}
 
-func (m *localLinkCache) Set(ctx context.Context, code string, url string) error { return nil }
-func (m *localLinkCache) Get(ctx context.Context, code string) (string, error)   { return "", nil }
-func (m *localLinkCache) Delete(ctx context.Context, code string) error          { return nil }
+func (m *localLinkCache) GetLink(ctx context.Context, code string) (*models.CachedLink, error) {
+	return m.store[code], nil
+}
+func (m *localLinkCache) SetLink(ctx context.Context, code string, link *models.CachedLink, ttl time.Duration) error {
+	m.store[code] = link
+	return nil
+}
+func (m *localLinkCache) DeleteLink(ctx context.Context, code string) error {
+	delete(m.store, code)
+	return nil
+}
+func (m *localLinkCache) Exists(ctx context.Context, code string) (bool, error) {
+	_, ok := m.store[code]
+	return ok, nil
+}
+
+type localWorkerPool struct{}
+
+func (m *localWorkerPool) Start(ctx context.Context) {}
+func (m *localWorkerPool) Submit(ctx context.Context, event worker.ClickEvent) error {
+	return nil
+}
+func (m *localWorkerPool) Shutdown(ctx context.Context) error {
+	return nil
+}
 
 func TestLinkHandler_Integration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -118,7 +146,7 @@ func TestLinkHandler_Integration(t *testing.T) {
 	refreshRepo := &localRefreshRepo{}
 	linkRepo := &localLinkRepo{links: make(map[uuid.UUID]*models.Link)}
 	analyticsRepo := &localAnalyticsRepo{}
-	linkCache := &localLinkCache{}
+	linkCache := &localLinkCache{store: make(map[string]*models.CachedLink)}
 	secret := "handlertestsecretkeythatisreallylong"
 	issuer := "linkpulse-api"
 	accessTTL := 5 * time.Minute
@@ -126,9 +154,10 @@ func TestLinkHandler_Integration(t *testing.T) {
 	baseURL := "http://localhost:8080"
 
 	authService := service.NewAuthService(userRepo, refreshRepo, secret, accessTTL, refreshTTL, issuer)
-	linkService := service.NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL)
+	linkService := service.NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
+	workerPool := &localWorkerPool{}
 
-	linkHandler := NewLinkHandler(linkService)
+	linkHandler := NewLinkHandler(linkService, workerPool)
 
 	// Router setup
 	r := gin.New()

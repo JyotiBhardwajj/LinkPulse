@@ -23,6 +23,7 @@ type LinkRepository interface {
 	Update(ctx context.Context, link *models.Link) error
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 	ExistsAlias(ctx context.Context, alias string) (bool, error)
+	DeactivateExpiredLinks(ctx context.Context) ([]models.Link, error)
 }
 
 type linkRepository struct {
@@ -157,4 +158,40 @@ func (r *linkRepository) ExistsAlias(ctx context.Context, alias string) (bool, e
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// DeactivateExpiredLinks retrieves expired, active links and batch updates their states.
+func (r *linkRepository) DeactivateExpiredLinks(ctx context.Context) ([]models.Link, error) {
+	var links []models.Link
+	now := time.Now()
+
+	// Optimized query filtering only active, expired records to support indexing bounds
+	err := r.db.WithContext(ctx).
+		Where("expires_at IS NOT NULL AND expires_at <= ? AND is_active = ?", now, true).
+		Find(&links).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(links) == 0 {
+		return nil, nil
+	}
+
+	var ids []uuid.UUID
+	for _, l := range links {
+		ids = append(ids, l.ID)
+	}
+
+	err = r.db.WithContext(ctx).
+		Model(&models.Link{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"is_active":  false,
+			"updated_at": now,
+		}).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return links, nil
 }

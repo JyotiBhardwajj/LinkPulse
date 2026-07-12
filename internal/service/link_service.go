@@ -16,18 +16,20 @@ import (
 	"linkpulse/internal/utils"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 // LinkService defines the operations for shortening, resolving, and managing URLs.
 type LinkService interface {
 	Create(ctx context.Context, req models.CreateLinkRequest, userID *uuid.UUID) (*models.LinkResponse, error)
-	Resolve(ctx context.Context, code string) (string, error)
+	Resolve(ctx context.Context, code string) (*models.CachedLink, error)
 	RecordClick(ctx context.Context, code string, details models.ClickDetails) error
 	GetStats(ctx context.Context, code string, userID uuid.UUID) (*models.LinkStatsResponse, error)
 	GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*models.LinkResponse, error)
 	List(ctx context.Context, userID uuid.UUID, query models.ListLinksQuery) (*models.PaginationResponse[models.LinkResponse], error)
 	Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, req models.UpdateLinkRequest) (*models.LinkResponse, error)
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
+	DeactivateExpiredLinks(ctx context.Context) (int, error)
 }
 
 type linkService struct {
@@ -37,6 +39,8 @@ type linkService struct {
 	shortCodeLength      int
 	maxGenerationRetries int
 	baseURL              string
+	cacheTTL             time.Duration
+	singleflightGroup    singleflight.Group
 }
 
 // NewLinkService instantiates a new LinkService implementation.
@@ -47,12 +51,16 @@ func NewLinkService(
 	shortCodeLength int,
 	maxGenerationRetries int,
 	baseURL string,
+	cacheTTL time.Duration,
 ) LinkService {
 	if shortCodeLength <= 0 {
 		shortCodeLength = 7
 	}
 	if maxGenerationRetries <= 0 {
 		maxGenerationRetries = 5
+	}
+	if cacheTTL <= 0 {
+		cacheTTL = 24 * time.Hour
 	}
 	return &linkService{
 		linkRepo:             linkRepo,
@@ -61,6 +69,7 @@ func NewLinkService(
 		shortCodeLength:      shortCodeLength,
 		maxGenerationRetries: maxGenerationRetries,
 		baseURL:              baseURL,
+		cacheTTL:             cacheTTL,
 	}
 }
 
@@ -159,24 +168,86 @@ func (s *linkService) Create(ctx context.Context, req models.CreateLinkRequest, 
 	}, nil
 }
 
-// Resolve fetches destination and handles validation checks (bypasses Redis cache during Day 3).
-func (s *linkService) Resolve(ctx context.Context, code string) (string, error) {
-	link, err := s.linkRepo.FindByShortCode(ctx, code)
+// Resolve fetches destination executing the Cache-Aside pattern.
+// Protects against cache stamps using singleflight.
+func (s *linkService) Resolve(ctx context.Context, code string) (*models.CachedLink, error) {
+	// 1. Check Redis Cache
+	cached, err := s.linkCache.GetLink(ctx, code)
 	if err != nil {
-		return "", err
+		// Cache error is logged in the cache layer; fallback to repository to prevent service disruption
+		cached = nil
 	}
 
-	// Active check
-	if !link.IsActive {
-		return "", fmt.Errorf("%w: link is deactivated", domainErrors.ErrNotFound)
+	if cached != nil {
+		// Cache Hit Lifecycle Checks
+		if !cached.IsActive {
+			return nil, fmt.Errorf("%w: link is deactivated", domainErrors.ErrNotFound)
+		}
+		if cached.ExpiresAt != nil && time.Now().After(*cached.ExpiresAt) {
+			return nil, fmt.Errorf("%w: link expired", domainErrors.ErrGone)
+		}
+		return cached, nil
 	}
 
-	// Expiration check
-	if link.ExpiresAt != nil && time.Now().After(*link.ExpiresAt) {
-		return "", fmt.Errorf("%w: link expired", domainErrors.ErrGone)
+	// 2. Cache Miss - singleflight stampede protection
+	res, err, _ := s.singleflightGroup.Do(code, func() (interface{}, error) {
+		// Double-check cache inside singleflight callback to handle immediate concurrent releases
+		doubleCheck, err := s.linkCache.GetLink(ctx, code)
+		if err == nil && doubleCheck != nil {
+			return doubleCheck, nil
+		}
+
+		link, err := s.linkRepo.FindByShortCode(ctx, code)
+		if err != nil {
+			return nil, err
+		}
+
+		// Lifecycle Validations
+		if !link.IsActive {
+			return nil, fmt.Errorf("%w: link is deactivated", domainErrors.ErrNotFound)
+		}
+		if link.ExpiresAt != nil && time.Now().After(*link.ExpiresAt) {
+			return nil, fmt.Errorf("%w: link expired", domainErrors.ErrGone)
+		}
+
+		cachedLink := &models.CachedLink{
+			ID:          link.ID,
+			OriginalURL: link.OriginalURL,
+			ShortCode:   link.ShortCode,
+			ExpiresAt:   link.ExpiresAt,
+			IsActive:    link.IsActive,
+		}
+
+		// Smarter Cache TTL: min(CACHE_TTL, remaining lifetime)
+		ttl := s.cacheTTL
+		if link.ExpiresAt != nil {
+			remaining := time.Until(*link.ExpiresAt)
+			if remaining <= 0 {
+				return nil, fmt.Errorf("%w: link expired", domainErrors.ErrGone)
+			}
+			if remaining < ttl {
+				ttl = remaining
+			}
+		}
+
+		// Save to cache asynchronously to prevent blocking response loop
+		go func() {
+			_ = s.linkCache.SetLink(context.Background(), code, cachedLink, ttl)
+		}()
+
+		return cachedLink, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	return link.OriginalURL, nil
+	cachedLink, ok := res.(*models.CachedLink)
+	if !ok {
+		return nil, fmt.Errorf("%w: failed to cast cache result", domainErrors.ErrInternal)
+	}
+
+	return cachedLink, nil
 }
 
 // RecordClick persists click analytics.
@@ -307,7 +378,7 @@ func (s *linkService) List(ctx context.Context, userID uuid.UUID, q models.ListL
 	}, nil
 }
 
-// Update partial-modifies a link's configuration.
+// Update partial-modifies a link's configuration. Invalidates cache immediately.
 func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, req models.UpdateLinkRequest) (*models.LinkResponse, error) {
 	link, err := s.linkRepo.FindByID(ctx, id)
 	if err != nil {
@@ -317,6 +388,9 @@ func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID
 	if link.UserID == nil || *link.UserID != userID {
 		return nil, domainErrors.ErrNotFound
 	}
+
+	// Invalidate cache for the old short code first
+	_ = s.linkCache.DeleteLink(ctx, link.ShortCode)
 
 	if req.Title != nil {
 		link.Title = *req.Title
@@ -336,6 +410,9 @@ func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID
 		return nil, err
 	}
 
+	// Invalidate cache for the updated short code
+	_ = s.linkCache.DeleteLink(ctx, link.ShortCode)
+
 	return &models.LinkResponse{
 		ID:          link.ID,
 		OriginalURL: link.OriginalURL,
@@ -350,7 +427,7 @@ func (s *linkService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID
 	}, nil
 }
 
-// Delete soft-deletes a link if owned by the user.
+// Delete soft-deletes a link if owned by the user. Invalidates cache immediately.
 func (s *linkService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
 	link, err := s.linkRepo.FindByID(ctx, id)
 	if err != nil {
@@ -361,5 +438,28 @@ func (s *linkService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID
 		return domainErrors.ErrNotFound
 	}
 
+	// Invalidate cache immediately
+	_ = s.linkCache.DeleteLink(ctx, link.ShortCode)
+
 	return s.linkRepo.SoftDelete(ctx, id)
+}
+
+// DeactivateExpiredLinks executes GORM queries to batch deactivate links and invalidates cache entries.
+func (s *linkService) DeactivateExpiredLinks(ctx context.Context) (int, error) {
+	links, err := s.linkRepo.DeactivateExpiredLinks(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	count := len(links)
+	if count == 0 {
+		return 0, nil
+	}
+
+	// Batch delete from cache
+	for _, l := range links {
+		_ = s.linkCache.DeleteLink(ctx, l.ShortCode)
+	}
+
+	return count, nil
 }

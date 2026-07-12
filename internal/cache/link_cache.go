@@ -3,49 +3,168 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
 	"time"
+
+	"linkpulse/internal/models"
+
+	"github.com/redis/go-redis/v9"
 )
 
-// LinkCache defines the caching operations for resolved URLs.
+// LinkCache defines caching operations for shortened URL responses.
 type LinkCache interface {
-	// Get retrieves the original URL associated with the short code.
-	Get(ctx context.Context, code string) (string, error)
+	// GetLink retrieves the CachedLink representation from cache.
+	GetLink(ctx context.Context, shortCode string) (*models.CachedLink, error)
 
-	// Set stores the original URL associated with the short code using the configured TTL.
-	Set(ctx context.Context, code string, originalURL string) error
+	// SetLink persists the CachedLink mapping into cache using configured prefix and calculated TTL.
+	SetLink(ctx context.Context, shortCode string, link *models.CachedLink, ttl time.Duration) error
 
-	// Delete removes the cached short code resolution.
-	Delete(ctx context.Context, code string) error
+	// DeleteLink removes a cached mapping immediately.
+	DeleteLink(ctx context.Context, shortCode string) error
+
+	// Exists checks if a cached mapping key exists.
+	Exists(ctx context.Context, shortCode string) (bool, error)
 }
 
 type linkCache struct {
 	redisClient *RedisClient
-	ttl         time.Duration
+	prefix      string
 }
 
 // NewLinkCache instantiates a LinkCache implementation backed by Redis.
-func NewLinkCache(redisClient *RedisClient, ttl time.Duration) LinkCache {
+func NewLinkCache(redisClient *RedisClient, prefix string) LinkCache {
 	return &linkCache{
 		redisClient: redisClient,
-		ttl:         ttl,
+		prefix:      prefix,
 	}
 }
 
-// Get checks the Redis cache for the given short code.
-func (c *linkCache) Get(ctx context.Context, code string) (string, error) {
-	val, err := c.redisClient.Client.Get(ctx, code).Result()
+// GetLink checks the Redis cache for the given short code, deserializing JSON.
+func (c *linkCache) GetLink(ctx context.Context, shortCode string) (*models.CachedLink, error) {
+	start := time.Now()
+	key := c.prefix + shortCode
+
+	val, err := c.redisClient.Client.Get(ctx, key).Result()
+	duration := time.Since(start)
+
 	if err != nil {
-		return "", err
+		if errors.Is(err, redis.Nil) {
+			slog.Info("Cache Miss",
+				"operation", "GetLink",
+				"short_code", shortCode,
+				"duration_ms", float64(duration.Microseconds())/1000.0,
+				"status", "miss",
+			)
+			return nil, nil // Return nil, nil on cache miss
+		}
+
+		slog.Error("Cache Error",
+			"operation", "GetLink",
+			"short_code", shortCode,
+			"duration_ms", float64(duration.Microseconds())/1000.0,
+			"status", "error",
+			"error", err.Error(),
+		)
+		return nil, err
 	}
-	return val, nil
+
+	var cachedLink models.CachedLink
+	if err := json.Unmarshal([]byte(val), &cachedLink); err != nil {
+		slog.Error("Cache Deserialization Error",
+			"operation", "GetLink",
+			"short_code", shortCode,
+			"duration_ms", float64(duration.Microseconds())/1000.0,
+			"status", "error",
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	slog.Info("Cache Hit",
+		"operation", "GetLink",
+		"short_code", shortCode,
+		"duration_ms", float64(duration.Microseconds())/1000.0,
+		"status", "hit",
+	)
+	return &cachedLink, nil
 }
 
-// Set saves the short code to original URL mapping in Redis with the specified TTL.
-func (c *linkCache) Set(ctx context.Context, code string, originalURL string) error {
-	return c.redisClient.Client.Set(ctx, code, originalURL, c.ttl).Err()
+// SetLink saves the short code to CachedLink mapping in Redis using calculated TTL.
+func (c *linkCache) SetLink(ctx context.Context, shortCode string, link *models.CachedLink, ttl time.Duration) error {
+	start := time.Now()
+	key := c.prefix + shortCode
+
+	bytes, err := json.Marshal(link)
+	if err != nil {
+		slog.Error("Cache Serialization Error",
+			"operation", "SetLink",
+			"short_code", shortCode,
+			"duration_ms", 0.0,
+			"status", "error",
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	err = c.redisClient.Client.Set(ctx, key, string(bytes), ttl).Err()
+	duration := time.Since(start)
+
+	if err != nil {
+		slog.Error("Cache Error",
+			"operation", "SetLink",
+			"short_code", shortCode,
+			"duration_ms", float64(duration.Microseconds())/1000.0,
+			"status", "error",
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	slog.Info("Cache Write",
+		"operation", "SetLink",
+		"short_code", shortCode,
+		"duration_ms", float64(duration.Microseconds())/1000.0,
+		"status", "success",
+	)
+	return nil
 }
 
-// Delete removes the cached mapping from Redis.
-func (c *linkCache) Delete(ctx context.Context, code string) error {
-	return c.redisClient.Client.Del(ctx, code).Err()
+// DeleteLink removes the cached mapping from Redis.
+func (c *linkCache) DeleteLink(ctx context.Context, shortCode string) error {
+	start := time.Now()
+	key := c.prefix + shortCode
+
+	err := c.redisClient.Client.Del(ctx, key).Err()
+	duration := time.Since(start)
+
+	if err != nil {
+		slog.Error("Cache Error",
+			"operation", "DeleteLink",
+			"short_code", shortCode,
+			"duration_ms", float64(duration.Microseconds())/1000.0,
+			"status", "error",
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	slog.Info("Cache Delete",
+		"operation", "DeleteLink",
+		"short_code", shortCode,
+		"duration_ms", float64(duration.Microseconds())/1000.0,
+		"status", "success",
+	)
+	return nil
+}
+
+// Exists checks if the cached key exists in Redis.
+func (c *linkCache) Exists(ctx context.Context, shortCode string) (bool, error) {
+	key := c.prefix + shortCode
+	count, err := c.redisClient.Client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

@@ -1,0 +1,98 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "LinkPulse API Engine",
+    "description": "High-performance URL Shortener and Analytics API engine. Note: Redirection endpoints utilize the Redis Cache-Aside pattern, and click metrics logging events are processed asynchronously through a Go worker pool.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/r/{code}": {
+      "get": {
+        "summary": "Redirect Shortened Link",
+        "description": "Resolves code using Redis Cache-Aside pattern (singleflight protected). Issues HTTP 302 redirect and fires click events asynchronously using Go worker pools.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Found redirection"
+          },
+          "404": {
+            "description": "Short code not found or deactivated"
+          },
+          "410": {
+            "description": "Short code has expired"
+          }
+        }
+      }
+    },
+    "/api/v1/links": {
+      "post": {
+        "summary": "Shorten a URL",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["original_url"],
+                "properties": {
+                  "original_url": { "type": "string" },
+                  "title": { "type": "string" },
+                  "custom_alias": { "type": "string" },
+                  "expires_at": { "type": "string", "format": "date-time" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Link created successfully"
+          }
+        }
+      },
+      "get": {
+        "summary": "List My Links",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["created_at", "updated_at", "expires_at"], "default": "created_at" } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

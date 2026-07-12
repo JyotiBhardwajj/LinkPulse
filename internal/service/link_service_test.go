@@ -87,7 +87,6 @@ func (m *mockLinkRepo) FindByUser(ctx context.Context, userID uuid.UUID, q model
 		// Apply search
 		if q.Search != "" {
 			match := false
-			// Simple exact or contains search for mock
 			if l.Title == q.Search || l.ShortCode == q.Search {
 				match = true
 			}
@@ -100,7 +99,6 @@ func (m *mockLinkRepo) FindByUser(ctx context.Context, userID uuid.UUID, q model
 	}
 
 	total := int64(len(result))
-	// Basic paginating offset/limit
 	offset := (q.Page - 1) * q.Limit
 	if offset >= len(result) {
 		return []models.Link{}, total, nil
@@ -136,6 +134,18 @@ func (m *mockLinkRepo) ExistsAlias(ctx context.Context, alias string) (bool, err
 	return false, nil
 }
 
+func (m *mockLinkRepo) DeactivateExpiredLinks(ctx context.Context) ([]models.Link, error) {
+	var deactivated []models.Link
+	now := time.Now()
+	for _, l := range m.links {
+		if l.IsActive && l.ExpiresAt != nil && l.ExpiresAt.Before(now) {
+			l.IsActive = false
+			deactivated = append(deactivated, *l)
+		}
+	}
+	return deactivated, nil
+}
+
 // In-memory mock AnalyticsRepository
 type mockAnalyticsRepo struct{}
 
@@ -152,12 +162,40 @@ func (m *mockAnalyticsRepo) GetClicksOverTime(ctx context.Context, linkID uuid.U
 	return []models.ClickTimeMetric{}, nil
 }
 
+// Simple in-memory mock LinkCache
+type mockLinkCache struct {
+	store map[string]*models.CachedLink
+}
+
+func (m *mockLinkCache) GetLink(ctx context.Context, code string) (*models.CachedLink, error) {
+	val, exists := m.store[code]
+	if !exists {
+		return nil, nil
+	}
+	return val, nil
+}
+
+func (m *mockLinkCache) SetLink(ctx context.Context, code string, link *models.CachedLink, ttl time.Duration) error {
+	m.store[code] = link
+	return nil
+}
+
+func (m *mockLinkCache) DeleteLink(ctx context.Context, code string) error {
+	delete(m.store, code)
+	return nil
+}
+
+func (m *mockLinkCache) Exists(ctx context.Context, code string) (bool, error) {
+	_, exists := m.store[code]
+	return exists, nil
+}
+
 func TestLinkService_CreateAndResolve(t *testing.T) {
 	linkRepo := newMockLinkRepo()
 	analyticsRepo := &mockAnalyticsRepo{}
-	linkCache := &mockLinkCache{}
+	linkCache := &mockLinkCache{store: make(map[string]*models.CachedLink)}
 	baseURL := "https://linkpulse.com"
-	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL)
+	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
 
 	ctx := context.Background()
 	userID := uuid.New()
@@ -219,14 +257,13 @@ func TestLinkService_CreateAndResolve(t *testing.T) {
 	})
 
 	t.Run("Resolve valid short code succeeds", func(t *testing.T) {
-		original, err := service.Resolve(ctx, "stripe-home")
+		cached, err := service.Resolve(ctx, "stripe-home")
 		require.NoError(t, err)
-		assert.Equal(t, "https://stripe.com", original)
+		assert.Equal(t, "https://stripe.com", cached.OriginalURL)
 	})
 
 	t.Run("Resolve expired short code returns ErrGone", func(t *testing.T) {
 		pastTime := time.Now().Add(-5 * time.Minute)
-		// Register a link with custom code
 		l := &models.Link{
 			ID:          uuid.New(),
 			OriginalURL: "https://expired.com",
@@ -241,7 +278,7 @@ func TestLinkService_CreateAndResolve(t *testing.T) {
 
 		dest, err := service.Resolve(ctx, "expired-slug")
 		assert.Error(t, err)
-		assert.Empty(t, dest)
+		assert.Nil(t, dest)
 		assert.True(t, errors.Is(err, domainErrors.ErrGone))
 	})
 }
@@ -249,9 +286,9 @@ func TestLinkService_CreateAndResolve(t *testing.T) {
 func TestLinkService_Management(t *testing.T) {
 	linkRepo := newMockLinkRepo()
 	analyticsRepo := &mockAnalyticsRepo{}
-	linkCache := &mockLinkCache{}
+	linkCache := &mockLinkCache{store: make(map[string]*models.CachedLink)}
 	baseURL := "https://linkpulse.com"
-	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL)
+	service := NewLinkService(linkRepo, analyticsRepo, linkCache, 7, 5, baseURL, 24*time.Hour)
 
 	ctx := context.Background()
 	userA := uuid.New()
@@ -298,10 +335,3 @@ func TestLinkService_Management(t *testing.T) {
 		assert.Nil(t, resp)
 	})
 }
-
-// Simple in-memory mock LinkCache
-type mockLinkCache struct{}
-
-func (m *mockLinkCache) Set(ctx context.Context, code string, originalURL string) error { return nil }
-func (m *mockLinkCache) Get(ctx context.Context, code string) (string, error)          { return "", nil }
-func (m *mockLinkCache) Delete(ctx context.Context, code string) error                  { return nil }

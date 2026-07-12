@@ -20,14 +20,17 @@ import (
 	"linkpulse/internal/repository"
 	"linkpulse/internal/routes"
 	"linkpulse/internal/service"
+	"linkpulse/internal/worker"
 )
 
 // Application coordinates database connections, dependency injection, and runtime state.
 type Application struct {
-	config     *config.Config
-	db         *database.PostgresDB
-	redis      *cache.RedisClient
-	httpServer *http.Server
+	config           *config.Config
+	db               *database.PostgresDB
+	redis            *cache.RedisClient
+	httpServer       *http.Server
+	workerPool       worker.WorkerPool
+	cleanupScheduler *worker.CleanupScheduler
 }
 
 // NewApplication instantiates all components and connects to external stores.
@@ -51,32 +54,46 @@ func NewApplication() (*Application, error) {
 	// 4. Connect to Redis
 	redisClient, err := cache.NewRedisClient(cfg.Redis)
 	if err != nil {
-		// Clean up Postgres connection if Redis fail
+		// Clean up Postgres connection if Redis fails
 		_ = db.Close()
 		return nil, fmt.Errorf("redis error: %w", err)
 	}
 
-	// 5. Initialize LinkCache
-	linkCache := cache.NewLinkCache(redisClient, cfg.Cache.TTL)
+	// 5. Initialize LinkCache (using prefix namespacing)
+	linkCache := cache.NewLinkCache(redisClient, cfg.Cache.Prefix)
 
 	// 6. Initialize Repositories (RepositoryManager)
 	repoMgr := repository.NewRepositoryManager(db.DB)
 
-	// 7. Initialize Services
+	// 7. Initialize WorkerPool
+	workerPool := worker.NewWorkerPool(repoMgr.Analytics(), cfg.Worker.Count, cfg.Worker.QueueSize)
+
+	// 8. Initialize Services
 	userService := service.NewUserService(repoMgr.Users())
-	linkService := service.NewLinkService(repoMgr.Links(), repoMgr.Analytics(), linkCache, cfg.Server.ShortCodeLength, cfg.Server.MaxGenerationRetries, cfg.Server.BaseURL)
+	linkService := service.NewLinkService(
+		repoMgr.Links(),
+		repoMgr.Analytics(),
+		linkCache,
+		cfg.Server.ShortCodeLength,
+		cfg.Server.MaxGenerationRetries,
+		cfg.Server.BaseURL,
+		cfg.Cache.TTL,
+	)
 	authService := service.NewAuthService(repoMgr.Users(), repoMgr.RefreshTokens(), cfg.JWT.Secret, cfg.JWT.AccessTokenTTL, cfg.JWT.RefreshTokenTTL, cfg.JWT.Issuer)
 
-	// 8. Initialize Handlers
+	// 9. Initialize CleanupScheduler
+	cleanupScheduler := worker.NewCleanupScheduler(linkService, cfg.Cleanup.Interval)
+
+	// 10. Initialize Handlers
 	healthHandler := handler.NewHealthHandler(db, redisClient, cfg.BuildVersion, cfg.GitCommit, cfg.Server.Env)
-	linkHandler := handler.NewLinkHandler(linkService)
+	linkHandler := handler.NewLinkHandler(linkService, workerPool)
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// 9. Setup HTTP Router
+	// 11. Setup HTTP Router
 	router := routes.SetupRouter(cfg.Server.RequestTimeout, cfg.JWT.Secret, cfg.JWT.Issuer, healthHandler, linkHandler, userHandler, authHandler)
 
-	// 10. Instantiate HTTP server wrapper
+	// 12. Instantiate HTTP server wrapper
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -87,16 +104,24 @@ func NewApplication() (*Application, error) {
 	}
 
 	return &Application{
-		config:     cfg,
-		db:         db,
-		redis:      redisClient,
-		httpServer: server,
+		config:           cfg,
+		db:               db,
+		redis:            redisClient,
+		httpServer:       server,
+		workerPool:       workerPool,
+		cleanupScheduler: cleanupScheduler,
 	}, nil
 }
 
 // Run starts the HTTP server in a goroutine and handles termination signals for graceful shutdown.
 func (a *Application) Run() error {
 	slog.Info("Starting HTTP server", "address", a.httpServer.Addr, "env", a.config.Server.Env)
+
+	// Start WorkerPool background channels
+	a.workerPool.Start(context.Background())
+
+	// Start Background Cleanup Scheduler ticker loop
+	a.cleanupScheduler.Start(context.Background())
 
 	// Start server in background goroutine
 	go func() {
@@ -117,21 +142,31 @@ func (a *Application) Run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// 1. Close HTTP Server (stops accepting new connections, waits for active requests)
+	// 1. Stop background cleanup scheduler ticker
+	a.cleanupScheduler.Stop()
+
+	// 2. Close HTTP Server (stops accepting new connections, waits for active requests)
 	if err := a.httpServer.Shutdown(ctx); err != nil {
 		slog.Error("HTTP server shutdown encountered an error", "error", err)
 	} else {
 		slog.Info("HTTP server stopped accepting new requests")
 	}
 
-	// 2. Close PostgreSQL connections
+	// 3. Stop worker pool and wait for remaining events
+	if err := a.workerPool.Shutdown(ctx); err != nil {
+		slog.Error("Worker pool shutdown encountered an error", "error", err)
+	} else {
+		slog.Info("Worker pool gracefully stopped")
+	}
+
+	// 4. Close PostgreSQL connections
 	if err := a.db.Close(); err != nil {
 		slog.Error("Error closing PostgreSQL connection pool", "error", err)
 	} else {
 		slog.Info("PostgreSQL connection pool closed successfully")
 	}
 
-	// 3. Close Redis connections
+	// 5. Close Redis connections
 	if err := a.redis.Close(); err != nil {
 		slog.Error("Error closing Redis client connection", "error", err)
 	} else {

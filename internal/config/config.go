@@ -35,7 +35,19 @@ type RedisConfig struct {
 
 // CacheConfig stores cache-specific settings.
 type CacheConfig struct {
-	TTL time.Duration `mapstructure:"CACHE_TTL"`
+	TTL    time.Duration `mapstructure:"CACHE_TTL"`
+	Prefix string        `mapstructure:"CACHE_PREFIX"`
+}
+
+// WorkerConfig stores settings for the background worker pool.
+type WorkerConfig struct {
+	Count     int `mapstructure:"WORKER_COUNT"`
+	QueueSize int `mapstructure:"WORKER_QUEUE_SIZE"`
+}
+
+// CleanupConfig stores settings for the background cleanup scheduler.
+type CleanupConfig struct {
+	Interval time.Duration `mapstructure:"CLEANUP_INTERVAL"`
 }
 
 // JWTConfig stores authentication secret keys and expiration values.
@@ -54,6 +66,8 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:",squash"`
 	Cache    CacheConfig    `mapstructure:",squash"`
 	JWT      JWTConfig      `mapstructure:",squash"`
+	Worker   WorkerConfig   `mapstructure:",squash"`
+	Cleanup  CleanupConfig  `mapstructure:",squash"`
 	LogLevel string         `mapstructure:"LOG_LEVEL"`
 	BuildVersion string     `mapstructure:"BUILD_VERSION"`
 	GitCommit    string     `mapstructure:"GIT_COMMIT"`
@@ -80,6 +94,10 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("REDIS_HOST", "localhost")
 	viper.SetDefault("REDIS_PORT", "6379")
 	viper.SetDefault("CACHE_TTL", "24h")
+	viper.SetDefault("CACHE_PREFIX", "link:")
+	viper.SetDefault("WORKER_COUNT", 5)
+	viper.SetDefault("WORKER_QUEUE_SIZE", 1000)
+	viper.SetDefault("CLEANUP_INTERVAL", "1h")
 	viper.SetDefault("JWT_SECRET", "supersecretjwtkeythatisreallylongandsecure")
 	viper.SetDefault("ACCESS_TOKEN_TTL", "15m")
 	viper.SetDefault("REFRESH_TOKEN_TTL", "7d")

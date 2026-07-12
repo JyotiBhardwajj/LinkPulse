@@ -60,30 +60,70 @@ The sequence below illustrates the execution flow for link resolving. Note how r
 
 ---
 
-### C. Caching Flow Diagram
-Our caching model ensures database read load is minimized during high-traffic viral link events:
+### C. Caching Flow Diagram (Cache-Aside with Singleflight)
+Our caching model ensures database read load is minimized and protects against cache stampedes during viral concurrent hit events:
 
 ```
                        [Incoming Request]
                                │
                                ▼
-                    [Check Redis Cache]
-                     /             \
-             (Hit)  /               \  (Miss)
-                   v                 v
-            [Return URL]      [Query PostgreSQL]
-                               /             \
-                     (Found)  /               \  (Expired/Not Found)
-                             v                 v
-                       [Write Redis]      [Return 404]
-                             │
-                             ▼
-                        [Return URL]
+                    [Check Redis Cache key]
+                     /                 \
+             (Hit)  /                   \  (Miss)
+                   v                     v
+            [Return URL]      [singleflight.Do(code)]
+                               /                 \
+                     (Shared Get)               (Query DB)
+                          /                          │
+                         v                           ▼
+                    [Return URL]               [Write Cache]
+                                                     │
+                                                     ▼
+                                                [Return URL]
 ```
 
 ---
 
-### D. Database ER Diagram
+### D. Worker Pool Flow Diagram
+Redirections offload analytics asynchronously to prevent transaction blocking:
+
+```
+[Incoming Request] ──► [HTTP Redirect]
+                              │
+                      (Async Submit)
+                              │
+                              ▼
+                [Bounded queue channel] ──► (Queue full?) ──► Yes ──► [Drop Event & slog.Warn]
+                              │
+                          No (Accept)
+                              │
+                              ▼
+                   [Worker pool workers] ──► [DB Insert Analytics]
+```
+
+---
+
+### E. Background Cleanup Scheduler Ticker Flow
+Expired links are periodically identified and cache keys are invalidated:
+
+```
+[time.NewTicker] ──► [Query Active Expired links]
+                                │
+                       (Composite Index query)
+                                │
+                                ▼
+                   [Batch DB is_active=false]
+                                │
+                                ▼
+                     [Cache Key Deletes]
+                                │
+                                ▼
+                        [slog.Info Summary]
+```
+
+---
+
+### F. Database ER Diagram
 
 ```
   users (Primary Account Data)
@@ -335,12 +375,15 @@ Location: https://news.ycombinator.com
 
 ## 5. Performance Optimizations
 
-1. **Write Contention Prevention**: NAIVE shorten architectures increment an integer counter (`clicks = clicks + 1`) directly in the link table. This requires row-locking updates. In LinkPulse, we log click events as append-only records in a separate `analytics` table, which converts row-locks into non-blocking inserts.
+1. **Write Contention Prevention & Go Worker Pool**: Click events are sent to a bounded channel and processed by a pool of background worker goroutines. If the queue channel fills up, events are dropped with a warning log, ensuring zero redirect latency impact.
 2. **Read Path Redirection Speed**: Redirection requests read from Redis cache, completing in <1ms without touching PostgreSQL.
-3. **Optimized Indexes**:
+3. **Cache Stampede Prevention (singleflight)**: Parallel cache misses on the same key are merged using Go's `singleflight.Group` so only one SQL query is run against Postgres while concurrent waiters share the resulting cache write.
+4. **Smarter Cache TTL**: The cache write TTL is dynamically calculated as `min(CACHE_TTL, remaining lifetime)` to ensure expired records do not persist in Redis memory.
+5. **Optimized Indexes**:
    - Composite index `(link_id, clicked_at)` speeds up aggregation queries tracking clicks within date bounds.
    - B-tree indices on `short_code` and `user_id` allow O(1) matching during redirects and user lists.
-4. **SkipDefaultTransaction**: GORM defaults to running every single write inside a transaction. We disable this (`SkipDefaultTransaction: true`) for performance since our repositories manage transactions manually.
+   - Composite index `(is_active, expires_at)` supports efficient background deactivations of expired records without scanning the entire table.
+6. **SkipDefaultTransaction**: GORM defaults to running every single write inside a transaction. We disable this (`SkipDefaultTransaction: true`) for performance since our repositories manage transactions manually.
 
 ---
 
@@ -356,7 +399,7 @@ Location: https://news.ycombinator.com
 
 - **Viper vs Env Variables**: Viper allows reading settings from files locally while letting production systems override them via environment variables seamlessly.
 - **Gin vs Standard `net/http`**: Gin is used for its highly optimized rad-tree routing engine and JSON binding conveniences. While standard library `net/http` is cleaner, Gin's performance on routing match parameters is production-tested.
-- **Synchronous Goroutines vs Event Message Broker (Kafka/RabbitMQ)**: Click analytics are currently recorded in a background goroutine. Although an external message broker handles high-volume loads better, it introduces significant setup overhead. We designed `RecordClick` as a separate, isolated service method to ensure that switching to an asynchronous task manager (e.g. Celery-style Redis queue) requires zero refactoring.
+- **Bounded Worker Pool Queue vs Redis Streams/Apache Kafka**: We implemented click tracking asynchronously using a context-aware worker pool running on a bounded in-memory Go channel. While this prevents blocking redirection threads, it has limited buffer memory capacity. Future scaling stages will replace this in-memory channel with a distributed log like **Redis Streams** or **Apache Kafka** to support durability, replication, and scaling across multiple API nodes without code refactor.
 
 ---
 
