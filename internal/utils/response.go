@@ -2,6 +2,9 @@
 package utils
 
 import (
+	"log/slog"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,8 +31,27 @@ func SendSuccess(c *gin.Context, status int, message string, data interface{}) {
 	})
 }
 
-// SendError sends a standardized error JSON response.
+// SendError sends a standardized error JSON response, masking internal error details.
 func SendError(c *gin.Context, status int, message string, code string) {
+	if status == http.StatusInternalServerError {
+		reqID := ""
+		if val, exists := c.Get("RequestID"); exists {
+			if id, ok := val.(string); ok {
+				reqID = id
+			}
+		}
+
+		// Log full internal error with RequestID metadata
+		slog.Error("Internal system failure",
+			slog.String("request_id", reqID),
+			slog.String("error_details", message),
+			slog.String("code", code),
+		)
+
+		// Sanitize client message to prevent system schema leaks
+		message = "An unexpected error occurred. Please try again later."
+	}
+
 	c.JSON(status, APIResponse{
 		Success: false,
 		Error: &ErrorData{

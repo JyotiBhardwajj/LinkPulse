@@ -163,3 +163,20 @@ type LinkAnalyticsResponse struct {
 	TopReferrers        []DistributionItem     `json:"top_referrers"`
 }
 
+// HealthResponse represents liveness API structure.
+type HealthResponse struct {
+	Status    string    `json:"status"`
+	Version   string    `json:"version"`
+	GitCommit string    `json:"git_commit"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ReadyResponse represents readiness API structure.
+type ReadyResponse struct {
+	Status     string    `json:"status"`
+	Database   string    `json:"database"`
+	Redis      string    `json:"redis"`
+	WorkerPool string    `json:"worker_pool"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+

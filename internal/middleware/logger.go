@@ -17,7 +17,7 @@ func Logger() gin.HandlerFunc {
 
 		c.Next()
 
-		latency := time.Since(start)
+		latencyMS := time.Since(start).Milliseconds()
 		status := c.Writer.Status()
 		reqID := GetRequestID(c)
 
@@ -36,14 +36,19 @@ func Logger() gin.HandlerFunc {
 			logFn = slog.Info
 		}
 
-		logFn("HTTP request processed",
+		logArgs := []any{
 			slog.String("request_id", reqID),
 			slog.String("method", c.Request.Method),
 			slog.String("path", fullPath),
 			slog.Int("status", status),
-			slog.Duration("latency", latency),
-			slog.String("ip", c.ClientIP()),
-			slog.String("user_agent", c.Request.UserAgent()),
-		)
+			slog.Int64("latency_ms", latencyMS),
+			slog.String("client_ip", c.ClientIP()),
+		}
+
+		if authCtx, exists := GetAuthContext(c); exists {
+			logArgs = append(logArgs, slog.String("user_id", authCtx.UserID.String()))
+		}
+
+		logFn("HTTP request processed", logArgs...)
 	}
 }

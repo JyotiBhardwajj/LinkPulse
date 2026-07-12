@@ -2,6 +2,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -60,6 +61,11 @@ func (p *PostgresDB) Ping() error {
 		return fmt.Errorf("database connection not initialized")
 	}
 	return p.sqlDB.Ping()
+}
+
+// Ready satisfies the ReadinessChecker interface.
+func (p *PostgresDB) Ready(ctx context.Context) error {
+	return p.Ping()
 }
 
 // Close gracefully releases the database connection pool resources.

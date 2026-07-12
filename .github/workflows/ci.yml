@@ -1,0 +1,47 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, "feature/*" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    name: Verify and Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+
+    - name: Set up Go environment
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true # Caches Go modules and build cache automatically
+
+    - name: Display Go compiler version
+      run: go version
+
+    - name: Download Go modules
+      run: go mod download
+
+    - name: Verify modules are tidy
+      run: |
+        go mod tidy
+        git diff --exit-code
+
+    - name: Verify code formatting (gofmt)
+      run: |
+        gofmt -w .
+        git diff --exit-code
+
+    - name: Run static analysis (go vet)
+      run: go vet ./...
+
+    - name: Run unit and integration tests
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Build project executables
+      run: go build ./...

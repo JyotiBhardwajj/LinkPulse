@@ -20,6 +20,9 @@ type WorkerPool interface {
 
 	// Shutdown stops all worker routines, waiting for queued tasks to finish up to context deadline.
 	Shutdown(ctx context.Context) error
+
+	// Ready checks if the worker pool is active and running.
+	Ready(ctx context.Context) error
 }
 
 type workerPool struct {
@@ -31,6 +34,9 @@ type workerPool struct {
 	onceStart     sync.Once
 	onceStop      sync.Once
 	stopChan      chan struct{}
+	started       bool
+	stopped       bool
+	mu            sync.Mutex
 }
 
 // NewWorkerPool instantiates a WorkerPool implementation.
@@ -53,6 +59,9 @@ func NewWorkerPool(analyticsRepo repository.AnalyticsRepository, workerCount, qu
 // Start launches concurrency worker loops.
 func (p *workerPool) Start(ctx context.Context) {
 	p.onceStart.Do(func() {
+		p.mu.Lock()
+		p.started = true
+		p.mu.Unlock()
 		slog.Info("Starting worker pool", "workers", p.workerCount, "queue_size", p.queueSize)
 		for i := 0; i < p.workerCount; i++ {
 			p.wg.Add(1)
@@ -80,6 +89,9 @@ func (p *workerPool) Submit(ctx context.Context, event ClickEvent) error {
 func (p *workerPool) Shutdown(ctx context.Context) error {
 	var err error
 	p.onceStop.Do(func() {
+		p.mu.Lock()
+		p.stopped = true
+		p.mu.Unlock()
 		slog.Info("Shutting down worker pool gracefully")
 		close(p.stopChan)
 		close(p.queue)
@@ -99,6 +111,19 @@ func (p *workerPool) Shutdown(ctx context.Context) error {
 		}
 	})
 	return err
+}
+
+// Ready returns whether the worker pool is running and healthy.
+func (p *workerPool) Ready(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.started {
+		return fmt.Errorf("worker pool is not started")
+	}
+	if p.stopped {
+		return fmt.Errorf("worker pool is stopped")
+	}
+	return nil
 }
 
 func (p *workerPool) workerLoop(ctx context.Context, workerID int) {

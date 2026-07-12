@@ -150,6 +150,9 @@ func (m *localWorkerPool) Submit(ctx context.Context, event worker.ClickEvent) e
 func (m *localWorkerPool) Shutdown(ctx context.Context) error {
 	return nil
 }
+func (m *localWorkerPool) Ready(ctx context.Context) error {
+	return nil
+}
 
 func TestLinkHandler_Integration(t *testing.T) {
 	gin.SetMode(gin.TestMode)

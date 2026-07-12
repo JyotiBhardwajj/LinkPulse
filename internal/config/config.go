@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/spf13/viper"
@@ -16,6 +17,9 @@ type ServerConfig struct {
 	ShortCodeLength      int           `mapstructure:"SHORT_CODE_LENGTH"`
 	MaxGenerationRetries int           `mapstructure:"MAX_GENERATION_RETRIES"`
 	BaseURL              string        `mapstructure:"BASE_URL"`
+	Version              string        `mapstructure:"BUILD_VERSION"`
+	GitCommit            string        `mapstructure:"GIT_COMMIT"`
+	BuildTime            string        `mapstructure:"BUILD_TIME"`
 }
 
 // DatabaseConfig stores PostgreSQL credentials and connection settings.
@@ -69,8 +73,53 @@ type Config struct {
 	Worker   WorkerConfig   `mapstructure:",squash"`
 	Cleanup  CleanupConfig  `mapstructure:",squash"`
 	LogLevel string         `mapstructure:"LOG_LEVEL"`
-	BuildVersion string     `mapstructure:"BUILD_VERSION"`
-	GitCommit    string     `mapstructure:"GIT_COMMIT"`
+}
+
+// Validate checks that all configuration parameters satisfy range constraints.
+func (c *Config) Validate() error {
+	if c.Server.Port == "" {
+		return fmt.Errorf("SERVER_PORT cannot be empty")
+	}
+	if c.Server.RequestTimeout <= 0 {
+		return fmt.Errorf("SERVER_REQUEST_TIMEOUT must be greater than 0")
+	}
+	if c.Server.BaseURL == "" {
+		return fmt.Errorf("BASE_URL cannot be empty")
+	}
+	u, err := url.ParseRequestURI(c.Server.BaseURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("BASE_URL '%s' is not a valid absolute URL: %w", c.Server.BaseURL, err)
+	}
+
+	if c.Database.Host == "" || c.Database.Port == "" || c.Database.DBName == "" || c.Database.User == "" {
+		return fmt.Errorf("database configuration is incomplete")
+	}
+	if c.Redis.Host == "" || c.Redis.Port == "" {
+		return fmt.Errorf("redis configuration is incomplete")
+	}
+
+	if c.Cache.TTL <= 0 {
+		return fmt.Errorf("CACHE_TTL must be greater than 0")
+	}
+
+	if c.Worker.Count <= 0 {
+		return fmt.Errorf("WORKER_COUNT must be greater than 0")
+	}
+	if c.Worker.QueueSize <= 0 {
+		return fmt.Errorf("WORKER_QUEUE_SIZE must be greater than 0")
+	}
+
+	if c.JWT.Secret == "" {
+		return fmt.Errorf("JWT_SECRET cannot be empty")
+	}
+	if c.JWT.AccessTokenTTL <= 0 {
+		return fmt.Errorf("ACCESS_TOKEN_TTL must be greater than 0")
+	}
+	if c.JWT.RefreshTokenTTL <= c.JWT.AccessTokenTTL {
+		return fmt.Errorf("REFRESH_TOKEN_TTL must be greater than ACCESS_TOKEN_TTL")
+	}
+
+	return nil
 }
 
 // LoadConfig reads the environment variables and files to populate the Config struct.
@@ -106,6 +155,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("BUILD_VERSION", "1.0.0")
 	viper.SetDefault("GIT_COMMIT", "unknown")
+	viper.SetDefault("BUILD_TIME", "unknown")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env is missing in production since environment variables may be injected directly.
@@ -115,6 +165,10 @@ func LoadConfig() (*Config, error) {
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %w", err)
+	}
+
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	return &config, nil

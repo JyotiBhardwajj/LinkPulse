@@ -1,0 +1,14 @@
+- [x] Configure detailed range validations in `internal/config/config.go`
+- [x] Declare `HealthResponse` and `ReadyResponse` in `internal/models/dto.go`
+- [x] Implement parallel readiness checking service in `internal/service/readiness_service.go` with 2-second timeout limits
+- [x] Add liveness `/health` and readiness `/ready` controllers in `internal/handler/health.go`
+- [x] Add mapping in `internal/routes/routes.go`
+- [x] Update structured latency_ms, client_ip, and authenticated user_id logging inside `internal/middleware/logger.go`
+- [x] Mask database and SQL details for 500 errors inside `internal/utils/response.go`
+- [x] Wire up everything with strict startup lifecycle verification and graceful shutdown order in `internal/app/application.go`
+- [x] Add unit tests for middleware, config, and health checks
+- [x] Setup GitHub Actions CI workflow in `.github/workflows/ci.yml`
+- [x] Update production `Dockerfile` with `HEALTHCHECK` instructions
+- [x] Add `verify`, `ci`, and `docker-build` targets in `Makefile`
+- [x] Update README with readiness, CI, shutdown, logging, config details
+- [x] Run verification checks (`go build`, `go test`, `go vet`)

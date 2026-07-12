@@ -453,3 +453,34 @@ LinkPulse bypasses GORM's built-in query generation and uses **Raw SQL** for ana
 3. **PostgreSQL Partitioning**: Partition the `analytics` table horizontally by month/year bounds to keep indices small and facilitate fast archival drops.
 4. **Redis Leaderboards**: Cache top links in sorted sets (`ZSET`) updated in real-time by the worker pool to bypass PostgreSQL entirely for top-links queries.
 
+---
+
+## 10. Production Readiness & Diagnostics
+
+### A. Health vs. Readiness Endpoints
+- **Liveness Endpoint (`GET /health`)**: Confirms that the HTTP server process is running and accepting routing requests. It is lightweight and does not query backend databases or caches, preventing cascading container restarts during network blips.
+- **Readiness Endpoint (`GET /ready`)**: Validates that all dependent services are reachable and running concurrently with a strict 2-second timeout (PostgreSQL database connectivity, Redis connection pool, background Worker Pool activity status). Returning `503 Service Unavailable` signals orchestrators to temporarily exclude this container from traffic rotation.
+- **Docker HEALTHCHECK**: Queries `/health` because a container should not be forcefully killed and restarted by Docker simply because an external DB/Redis is temporarily offline.
+
+### B. Startup & Shutdown Lifecycles
+- **Startup sequence**: Load Config ➔ Validate Config (range bounds & absolute URL asserts) ➔ Initialize Logger ➔ Connect Postgres ➔ Verify Migrations (assert tables exist) ➔ Connect Redis ➔ Initialize Worker Pool ➔ Initialize Services ➔ Initialize Handlers ➔ Setup Router ➔ Start Server.
+- **Shutdown sequence**:
+  1. Stop accepting HTTP requests (allow active threads to complete).
+  2. Drain Worker Pool (ensures all in-memory metrics flush to PostgreSQL).
+  3. Close Redis connection client.
+  4. Close PostgreSQL connection pool (safe now that workers and handlers have finished writes).
+  5. Flush structured Logger.
+
+### C. Logging & Error Masking
+- **Request Tracing**: All requests receive a `request_id` (propagated in context and response headers).
+- **Log attributes**: Every structured slog line contains: `request_id`, `method`, `path`, `status`, `latency_ms`, `client_ip`, and `user_id` (if authenticated).
+- **Error masking**: `SendError` intercepts `500 Internal Server Error` calls, prints full error diagnostics to slog, and overrides client message with: `"An unexpected error occurred. Please try again later."` to prevent schema leaks.
+
+### D. Compile-Time build ldflags Injection
+Build metadata versioning is injected during compile-time:
+```bash
+go build -ldflags "-X main.version=1.0.0 -X main.gitCommit=$(git rev-parse HEAD) -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/linkpulse cmd/api/main.go
+```
+These parameters are reported dynamically on the `/health` payload.
+
+

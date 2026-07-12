@@ -36,6 +36,7 @@ func SetupRouter(
 
 	// Diagnostic Endpoints
 	r.GET("/health", healthHandler.Check)
+	r.GET("/ready", healthHandler.CheckReady)
 
 	// Redirect Endpoint (Optimized path)
 	r.GET("/r/:code", linkHandler.Resolve)

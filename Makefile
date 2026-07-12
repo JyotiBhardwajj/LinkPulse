@@ -1,4 +1,4 @@
-.PHONY: run build fmt lint test swagger migrate-up migrate-down docker-up docker-down
+.PHONY: run build fmt lint test swagger migrate-up migrate-down verify ci docker-build docker-up docker-down
 
 # Local run
 run:
@@ -18,7 +18,7 @@ lint:
 
 # Run test suite
 test:
-	go test -v -cover ./...
+	go test -v -race -cover ./...
 
 # Compile Swagger specs (requires github.com/swaggo/swag/cmd/swag)
 swagger:
@@ -31,6 +31,21 @@ migrate-up:
 # Run db migrations down
 migrate-down:
 	migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/linkpulse_db?sslmode=disable" down
+
+# Verify local code quality (tidy check, formatting, vet, test, build)
+verify:
+	go mod tidy
+	go fmt ./...
+	go vet ./...
+	go test -race ./...
+	go build ./...
+
+# CI alias command
+ci: verify
+
+# Build docker image locally
+docker-build:
+	docker build -t linkpulse:latest .
 
 # Spin up Docker containers
 docker-up:

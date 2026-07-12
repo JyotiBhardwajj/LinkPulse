@@ -44,6 +44,11 @@ func (r *RedisClient) Ping(ctx context.Context) error {
 	return r.Client.Ping(ctx).Err()
 }
 
+// Ready satisfies the ReadinessChecker interface.
+func (r *RedisClient) Ready(ctx context.Context) error {
+	return r.Ping(ctx)
+}
+
 // Close gracefully closes the Redis client connections.
 func (r *RedisClient) Close() error {
 	if r.Client == nil {
