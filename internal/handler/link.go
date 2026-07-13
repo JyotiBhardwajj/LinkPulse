@@ -34,7 +34,7 @@ func NewLinkHandler(linkService service.LinkService, workerPool worker.WorkerPoo
 func (h *LinkHandler) Create(c *gin.Context) {
 	var req models.CreateLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
@@ -96,7 +96,13 @@ func (h *LinkHandler) Get(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "id",
+				Rule:    "uuid",
+				Message: "The id field must be a valid UUID",
+			},
+		})
 		return
 	}
 
@@ -113,6 +119,15 @@ func (h *LinkHandler) Get(c *gin.Context) {
 		return
 	}
 
+	// Deterministic ETag-based caching support
+	etag := utils.ComputeETag(resp)
+	c.Header("Cache-Control", "public, max-age=0, must-revalidate")
+	c.Header("ETag", etag)
+	if utils.CheckIfNoneMatch(c, etag) {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
 	utils.SendSuccess(c, http.StatusOK, "Link retrieved successfully", resp)
 }
 
@@ -120,7 +135,7 @@ func (h *LinkHandler) Get(c *gin.Context) {
 func (h *LinkHandler) List(c *gin.Context) {
 	var q models.ListLinksQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_QUERY_PARAMS")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, q))
 		return
 	}
 
@@ -137,7 +152,16 @@ func (h *LinkHandler) List(c *gin.Context) {
 		return
 	}
 
-	utils.SendSuccess(c, http.StatusOK, "Links retrieved successfully", resp)
+	// Deterministic ETag-based caching support for listing resource
+	etag := utils.ComputeETag(resp)
+	c.Header("Cache-Control", "public, max-age=0, must-revalidate")
+	c.Header("ETag", etag)
+	if utils.CheckIfNoneMatch(c, etag) {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
+	utils.SendPaginatedSuccess(c, http.StatusOK, "Links retrieved successfully", resp, resp.Page, resp.Limit, resp.Total, resp.TotalPages)
 }
 
 // Update partial-modifies link configurations.
@@ -145,13 +169,19 @@ func (h *LinkHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "id",
+				Rule:    "uuid",
+				Message: "The id field must be a valid UUID",
+			},
+		})
 		return
 	}
 
 	var req models.UpdateLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
@@ -176,7 +206,13 @@ func (h *LinkHandler) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "id",
+				Rule:    "uuid",
+				Message: "The id field must be a valid UUID",
+			},
+		})
 		return
 	}
 
@@ -200,7 +236,16 @@ func (h *LinkHandler) Delete(c *gin.Context) {
 func (h *LinkHandler) GetStats(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
-		utils.SendError(c, http.StatusBadRequest, "short code is required", "MISSING_SHORT_CODE")
+		code = c.Param("id")
+	}
+	if code == "" {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "code",
+				Rule:    "required",
+				Message: "The code parameter is required",
+			},
+		})
 		return
 	}
 

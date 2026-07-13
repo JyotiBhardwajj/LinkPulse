@@ -6,9 +6,14 @@ import (
 )
 
 // RateLimit acts as a placeholder for token-bucket or sliding-window rate limiting.
+// Injects standard Rate Limiting headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After).
 func RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Placeholder: Will integrate Redis-based rate limiting in subsequent phases.
+		// Default limits (100 requests per window placeholder)
+		c.Header("X-RateLimit-Limit", "100")
+		c.Header("X-RateLimit-Remaining", "99")
+		c.Header("Retry-After", "0")
+
 		c.Next()
 	}
 }

@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	domainErrors "linkpulse/internal/errors"
@@ -56,19 +54,29 @@ func (h *AnalyticsHandler) GetClicksOverTime(c *gin.Context) {
 		return
 	}
 
-	start, end, err := h.parseDates(c)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_DATE_FORMAT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
-	interval := c.DefaultQuery("interval", "day")
+	start, end, _ := h.parseDates(req)
+	if req.StartDate != "" && req.EndDate != "" && end.Before(start) {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "end_date",
+				Rule:    "gtfield",
+				Message: "The end_date field must be after or equal to start_date",
+			},
+		})
+		return
+	}
 
 	q := models.AnalyticsQuery{
 		UserID:    authCtx.UserID,
 		StartDate: start,
 		EndDate:   end,
-		Interval:  interval,
+		Interval:  req.Interval,
 	}
 
 	points, err := h.analyticsService.GetClicksOverTime(c.Request.Context(), q)
@@ -89,16 +97,15 @@ func (h *AnalyticsHandler) GetTopLinks(c *gin.Context) {
 		return
 	}
 
-	limitStr := c.DefaultQuery("limit", "10")
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "limit parameter must be an integer", "INVALID_LIMIT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
 	q := models.AnalyticsQuery{
 		UserID: authCtx.UserID,
-		Limit:  limit,
+		Limit:  req.Limit,
 	}
 
 	topLinks, err := h.analyticsService.GetTopLinks(c.Request.Context(), q)
@@ -119,9 +126,21 @@ func (h *AnalyticsHandler) GetDeviceDistribution(c *gin.Context) {
 		return
 	}
 
-	start, end, err := h.parseDates(c)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_DATE_FORMAT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
+		return
+	}
+
+	start, end, _ := h.parseDates(req)
+	if req.StartDate != "" && req.EndDate != "" && end.Before(start) {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "end_date",
+				Rule:    "gtfield",
+				Message: "The end_date field must be after or equal to start_date",
+			},
+		})
 		return
 	}
 
@@ -149,9 +168,21 @@ func (h *AnalyticsHandler) GetBrowserDistribution(c *gin.Context) {
 		return
 	}
 
-	start, end, err := h.parseDates(c)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_DATE_FORMAT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
+		return
+	}
+
+	start, end, _ := h.parseDates(req)
+	if req.StartDate != "" && req.EndDate != "" && end.Before(start) {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "end_date",
+				Rule:    "gtfield",
+				Message: "The end_date field must be after or equal to start_date",
+			},
+		})
 		return
 	}
 
@@ -179,16 +210,21 @@ func (h *AnalyticsHandler) GetReferrerDistribution(c *gin.Context) {
 		return
 	}
 
-	start, end, err := h.parseDates(c)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_DATE_FORMAT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
-	limitStr := c.DefaultQuery("limit", "10")
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "limit parameter must be an integer", "INVALID_LIMIT")
+	start, end, _ := h.parseDates(req)
+	if req.StartDate != "" && req.EndDate != "" && end.Before(start) {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "end_date",
+				Rule:    "gtfield",
+				Message: "The end_date field must be after or equal to start_date",
+			},
+		})
 		return
 	}
 
@@ -196,7 +232,7 @@ func (h *AnalyticsHandler) GetReferrerDistribution(c *gin.Context) {
 		UserID:    authCtx.UserID,
 		StartDate: start,
 		EndDate:   end,
-		Limit:     limit,
+		Limit:     req.Limit,
 	}
 
 	referrers, err := h.analyticsService.GetReferrerDistribution(c.Request.Context(), q)
@@ -214,7 +250,13 @@ func (h *AnalyticsHandler) GetLinkAnalytics(c *gin.Context) {
 	idStr := c.Param("id")
 	linkID, err := uuid.Parse(idStr)
 	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, "invalid link ID format", "INVALID_LINK_ID")
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "id",
+				Rule:    "uuid",
+				Message: "The id field must be a valid UUID",
+			},
+		})
 		return
 	}
 
@@ -224,9 +266,21 @@ func (h *AnalyticsHandler) GetLinkAnalytics(c *gin.Context) {
 		return
 	}
 
-	start, end, err := h.parseDates(c)
-	if err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_DATE_FORMAT")
+	var req models.AnalyticsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
+		return
+	}
+
+	start, end, _ := h.parseDates(req)
+	if req.StartDate != "" && req.EndDate != "" && end.Before(start) {
+		utils.SendValidationError(c, []models.ValidationError{
+			{
+				Field:   "end_date",
+				Rule:    "gtfield",
+				Message: "The end_date field must be after or equal to start_date",
+			},
+		})
 		return
 	}
 
@@ -247,29 +301,26 @@ func (h *AnalyticsHandler) GetLinkAnalytics(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Link analytics compiled successfully", report)
 }
 
-func (h *AnalyticsHandler) parseDates(c *gin.Context) (time.Time, time.Time, error) {
-	startStr := c.Query("start_date")
-	endStr := c.Query("end_date")
-
+func (h *AnalyticsHandler) parseDates(req models.AnalyticsQueryRequest) (time.Time, time.Time, error) {
 	var start, end time.Time
 	var err error
 
-	if startStr != "" {
-		start, err = time.Parse(time.RFC3339, startStr)
+	if req.StartDate != "" {
+		start, err = time.Parse(time.RFC3339, req.StartDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("start_date format must be RFC3339")
+			return time.Time{}, time.Time{}, err
 		}
 	} else {
-		start = time.Now().Add(-30 * 24 * time.Hour) // 30 days ago fallback default
+		start = time.Now().Add(-30 * 24 * time.Hour)
 	}
 
-	if endStr != "" {
-		end, err = time.Parse(time.RFC3339, endStr)
+	if req.EndDate != "" {
+		end, err = time.Parse(time.RFC3339, req.EndDate)
 		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("end_date format must be RFC3339")
+			return time.Time{}, time.Time{}, err
 		}
 	} else {
-		end = time.Now() // now fallback default
+		end = time.Now()
 	}
 
 	return start.UTC(), end.UTC(), nil

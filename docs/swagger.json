@@ -2,14 +2,609 @@
   "openapi": "3.0.3",
   "info": {
     "title": "LinkPulse API Engine",
-    "description": "High-performance URL Shortener and Analytics API engine. Note: Redirection endpoints utilize the Redis Cache-Aside pattern, and click metrics logging events are processed asynchronously through a Go worker pool.",
+    "description": "High-performance URL Shortener and Analytics API engine. This production-grade API platform provides RFC7807 problem details, Correlation IDs (X-Request-ID), ETag validation caching, and detailed Prometheus monitoring metrics. Clean Architecture principles govern the service flow.",
     "version": "1.0.0"
   },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development Server"
+    }
+  ],
   "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Liveness Check",
+        "description": "Returns system metadata to confirm liveness. Safe method.",
+        "operationId": "checkHealth",
+        "responses": {
+          "200": {
+            "description": "System is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Health check successful",
+                  "data": {
+                    "status": "healthy",
+                    "version": "1.0.0",
+                    "git_commit": "8dfa0f6",
+                    "timestamp": "2026-07-13T11:47:00Z"
+                  },
+                  "request_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Readiness Check",
+        "description": "Returns connectivity state to PostgreSQL, Redis, and WorkerPool.",
+        "operationId": "checkReady",
+        "responses": {
+          "200": {
+            "description": "System services are ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Ready check successful",
+                  "data": {
+                    "status": "ready",
+                    "database": "connected",
+                    "redis": "connected",
+                    "worker_pool": "running",
+                    "timestamp": "2026-07-13T11:47:00Z"
+                  },
+                  "request_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more backing services failed health check",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Prometheus Scraping Endpoint",
+        "description": "Exposes standard Prometheus scrape format metrics. Bypasses logging and rate limits.",
+        "operationId": "getMetrics",
+        "responses": {
+          "200": {
+            "description": "Scrape metrics output",
+            "content": {
+              "text/plain; version=0.0.4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/r/{code}": {
       "get": {
+        "tags": ["Links"],
         "summary": "Redirect Shortened Link",
-        "description": "Resolves code using Redis Cache-Aside pattern (singleflight protected). Issues HTTP 302 redirect and fires click events asynchronously using Go worker pools.",
+        "description": "Resolves code using Redis Cache-Aside. Issues HTTP 302 Found redirect and schedules analytics logs asynchronously.",
+        "operationId": "resolveLink",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "customAlias"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect mapping found"
+          },
+          "404": {
+            "description": "Short code not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Short code has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register User Account",
+        "description": "Registers a new user. Password is limited to 72 characters due to bcrypt limits.",
+        "operationId": "registerUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON payload",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email address already registered",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation constraint failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User Authenticated Login",
+        "description": "Verifies email and password credentials. Generates token pair, parses User-Agent headers, and registers a device session.",
+        "operationId": "loginUser",
+        "parameters": [
+          {
+            "name": "X-Device-Name",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Custom user-agent client identifier override"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication succeeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Refresh Access Token",
+        "description": "Rotates refresh tokens and returns a new Access-Refresh pair.",
+        "operationId": "refreshToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session tokens rotated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or revoked refresh token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Revoke Current Session",
+        "description": "Revokes specified refresh token and prunes user active session.",
+        "operationId": "logoutUser",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "List Active Device Sessions",
+        "description": "Returns active user login profiles mapped inside PostgreSQL. Supports ETags.",
+        "operationId": "getSessions",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Revoke All User Sessions",
+        "description": "Terminates all sessions. Forces user authentication challenge on next request.",
+        "operationId": "logoutAll",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All sessions terminated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get User Profile",
+        "description": "Returns current user session metadata details.",
+        "operationId": "getUserProfile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile data retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/links": {
+      "post": {
+        "tags": ["Links"],
+        "summary": "Shorten URL Link",
+        "description": "Creates a shortened code mapping. Optional expiration date constraint.",
+        "operationId": "createLink",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Link mapping created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "URL validation or constraints error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Links"],
+        "summary": "List User Shortened Links",
+        "description": "Returns links mapped to authenticated user account. Standardized pagination metadata. Supports ETag validation.",
+        "operationId": "listLinks",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Links compiled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/links/{id}": {
+      "get": {
+        "tags": ["Links"],
+        "summary": "Get Link Details",
+        "description": "Retrieves active properties. Supports ETag cache validation.",
+        "operationId": "getLink",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link details returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Link ID not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Links"],
+        "summary": "Update Link Mappings",
+        "description": "Partially updates details (title, expiration, active state).",
+        "operationId": "updateLink",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update applied successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Links"],
+        "summary": "Delete Short Code",
+        "description": "Soft-deletes the link code. Prevents subsequent redirections.",
+        "operationId": "deleteLink",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deactivated and soft-deleted"
+          }
+        }
+      }
+    },
+    "/api/v1/links/{code}/stats": {
+      "get": {
+        "tags": ["Links"],
+        "summary": "De-referenced Link Performance Stats",
+        "description": "Simple request payload tracking metrics counts by code.",
+        "operationId": "getLinkStats",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "code",
@@ -21,207 +616,224 @@
           }
         ],
         "responses": {
-          "302": {
-            "description": "Found redirection"
-          },
-          "404": {
-            "description": "Short code not found or deactivated"
-          },
-          "410": {
-            "description": "Short code has expired"
-          }
-        }
-      }
-    },
-    "/api/v1/links": {
-      "post": {
-        "summary": "Shorten a URL",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["original_url"],
-                "properties": {
-                  "original_url": { "type": "string" },
-                  "title": { "type": "string" },
-                  "custom_alias": { "type": "string" },
-                  "expires_at": { "type": "string", "format": "date-time" }
+          "200": {
+            "description": "Aggregate statistics retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
                 }
               }
             }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Link created successfully"
-          }
-        }
-      },
-      "get": {
-        "summary": "List My Links",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
-          { "name": "search", "in": "query", "schema": { "type": "string" } },
-          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["created_at", "updated_at", "expires_at"], "default": "created_at" } },
-          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/overview": {
-      "get": {
-        "summary": "Portfolio Analytics Overview",
-        "description": "Returns aggregated summary metrics for all links belonging to the authenticated user.",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Overview metrics retrieved successfully"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/clicks": {
-      "get": {
-        "summary": "Time-Series Click History",
-        "description": "Returns zero-filled click history timeline counts grouped by time buckets.",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "interval", "in": "query", "schema": { "type": "string", "enum": ["hour", "day", "week", "month"], "default": "day" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Timeline compiled successfully"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/top-links": {
-      "get": {
-        "summary": "Top Performing Links",
-        "description": "Returns shortened links ordered by total click counts.",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Top links retrieved successfully"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/devices": {
-      "get": {
-        "summary": "Device Distribution",
-        "description": "Returns device platform percentages and counts (Desktop, Mobile, Tablet, Unknown).",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Devices distribution compiled successfully"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/browsers": {
-      "get": {
-        "summary": "Browser Distribution",
-        "description": "Returns browser agent counts and percentages (Chrome, Firefox, Safari, Edge, Opera, Unknown).",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Browsers distribution compiled successfully"
-          }
-        }
-      }
-    },
-    "/api/v1/analytics/referrers": {
-      "get": {
-        "summary": "Referrer Domain Distribution",
-        "description": "Returns top domain sources referring click traffic.",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Referrers compiled successfully"
           }
         }
       }
     },
     "/api/v1/links/{id}/analytics": {
       "get": {
-        "summary": "Detailed Single Link Analytics",
-        "description": "Returns full metrics suite (time-series, devices, browsers, referrers) for a specific shortened link ID.",
+        "tags": ["Analytics"],
+        "summary": "Detailed Analytics Report",
+        "description": "Dynamic time-series click history and user agent distribution for a single link ID.",
+        "operationId": "getLinkAnalytics",
         "security": [
           {
             "BearerAuth": []
           }
         ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date-time" } },
-          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          { "$ref": "#/components/parameters/startDate" },
+          { "$ref": "#/components/parameters/endDate" }
         ],
         "responses": {
           "200": {
-            "description": "Link analytics report compiled successfully"
-          },
-          "404": {
-            "description": "Link not found or ownership check failed"
+            "description": "Report compiled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/overview": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Portfolio Overview",
+        "description": "Total aggregates for user active/inactive links and total clicks.",
+        "operationId": "getOverview",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated summary metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/clicks": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Time-Series Click History",
+        "description": "Click metrics timeline grouped by interval buckets (hour, day, week, month).",
+        "operationId": "getClicksOverTime",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/startDate" },
+          { "$ref": "#/components/parameters/endDate" },
+          { "$ref": "#/components/parameters/interval" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Click timeline aggregated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/top-links": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Top Performing Links List",
+        "description": "Shortened URL mappings sorted descending by click counters.",
+        "operationId": "getTopLinks",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/limitQuery" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Best performing codes returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/devices": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Device Type Analytics",
+        "description": "Aggregates click history percentages by Desktop, Mobile, and Tablet.",
+        "operationId": "getDevices",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/startDate" },
+          { "$ref": "#/components/parameters/endDate" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices distribution computed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/browsers": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "User Agent Browser Analytics",
+        "description": "Aggregates click counts by Web Browser client.",
+        "operationId": "getBrowsers",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/startDate" },
+          { "$ref": "#/components/parameters/endDate" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Browsers distribution computed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/referrers": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Referrer Traffic Domain Analytics",
+        "description": "Identifies web hosts referring network traffic click actions.",
+        "operationId": "getReferrers",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          { "$ref": "#/components/parameters/startDate" },
+          { "$ref": "#/components/parameters/endDate" },
+          { "$ref": "#/components/parameters/limitQuery" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Referrers compiled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -233,6 +845,224 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "search": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "sort": {
+        "name": "sort",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["created_at", "updated_at", "expires_at"],
+          "default": "created_at"
+        }
+      },
+      "order": {
+        "name": "order",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["asc", "desc"],
+          "default": "desc"
+        }
+      },
+      "startDate": {
+        "name": "start_date",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "endDate": {
+        "name": "end_date",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "interval": {
+        "name": "interval",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["hour", "day", "week", "month"],
+          "default": "day"
+        }
+      },
+      "limitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "schemas": {
+      "ValidationError": {
+        "type": "object",
+        "required": ["field", "rule", "message"],
+        "properties": {
+          "field": { "type": "string" },
+          "rule": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "ErrorDetails": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "data": { "type": "object" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["success", "error", "type", "title", "status", "detail", "instance", "request_id"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "error": { "$ref": "#/components/schemas/ErrorDetails" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "required": ["success", "error", "type", "title", "status", "detail", "instance", "details", "request_id"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "error": { "$ref": "#/components/schemas/ErrorDetails" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "details": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ValidationError" }
+          },
+          "request_id": { "type": "string" }
+        }
+      },
+      "PaginationMetadata": {
+        "type": "object",
+        "required": ["page", "page_size", "total", "total_pages", "has_next", "has_previous"],
+        "properties": {
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" },
+          "total": { "type": "integer" },
+          "total_pages": { "type": "integer" },
+          "has_next": { "type": "boolean" },
+          "has_previous": { "type": "boolean" }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "required": ["success", "data", "metadata", "request_id"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "data": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "metadata": { "$ref": "#/components/schemas/PaginationMetadata" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "UserRegisterRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8, "maxLength": 72 }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": { "type": "string" }
+        }
+      },
+      "CreateLinkRequest": {
+        "type": "object",
+        "required": ["original_url"],
+        "properties": {
+          "original_url": { "type": "string", "format": "uri" },
+          "title": { "type": "string", "maxLength": 255 },
+          "custom_alias": { "type": "string", "minLength": 3, "maxLength": 50 },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UpdateLinkRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "maxLength": 255 },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "is_active": { "type": "boolean" }
+        }
       }
     }
   }

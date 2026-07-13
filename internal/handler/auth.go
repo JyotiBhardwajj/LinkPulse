@@ -27,7 +27,7 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req models.UserRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req models.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req models.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendError(c, http.StatusBadRequest, err.Error(), "INVALID_REQUEST_BODY")
+		utils.SendValidationError(c, utils.FormatValidationErrors(err, req))
 		return
 	}
 

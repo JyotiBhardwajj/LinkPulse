@@ -53,61 +53,19 @@ func SetupRouter(
 	// Redirect Endpoint (Optimized path)
 	r.GET("/r/:code", linkHandler.Resolve)
 
+	// Static Swagger spec file
+	r.StaticFile("/docs/swagger.json", "./docs/swagger.json")
+
 	// Instantiate authorization middleware wrapper
 	authMiddleware := middleware.Auth(jwtSecret, jwtIssuer)
 
-	// API Group
-	api := r.Group("/api/v1")
-	{
-		// Authentication Routes Group
-		auth := api.Group("/auth")
-		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.Refresh)
-			auth.POST("/logout", authMiddleware, authHandler.Logout)
-			auth.GET("/sessions", authMiddleware, authHandler.GetSessions)
-			auth.POST("/logout-all", authMiddleware, authHandler.LogoutAll)
-		}
+	// API Group V1
+	v1 := r.Group("/api/v1")
+	registerV1Routes(v1, authMiddleware, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler)
 
-		// User Profile Routes Group
-		users := api.Group("/users")
-		{
-			// Protected user current profile lookup
-			users.GET("/me", authMiddleware, userHandler.Me)
-		}
-
-		// Shortened Links Routes Group (Fully authenticated for CRUD operations)
-		links := api.Group("/links", authMiddleware)
-		{
-			links.POST("", linkHandler.Create)
-			links.GET("", linkHandler.List)
-			links.GET("/:id", linkHandler.Get)
-			links.PATCH("/:id", linkHandler.Update)
-			links.DELETE("/:id", linkHandler.Delete)
-			links.GET("/:code/stats", linkHandler.GetStats)
-			links.GET("/:id/analytics", analyticsHandler.GetLinkAnalytics)
-		}
-
-		// Analytics Routes Group (Fully authenticated for metrics dashboard)
-		analytics := api.Group("/analytics", authMiddleware)
-		{
-			analytics.GET("/overview", analyticsHandler.GetOverview)
-			analytics.GET("/clicks", analyticsHandler.GetClicksOverTime)
-			analytics.GET("/top-links", analyticsHandler.GetTopLinks)
-			analytics.GET("/devices", analyticsHandler.GetDeviceDistribution)
-			analytics.GET("/browsers", analyticsHandler.GetBrowserDistribution)
-			analytics.GET("/referrers", analyticsHandler.GetReferrerDistribution)
-		}
-
-		// Admin Routes Group (RBAC Protected placeholder)
-		admin := api.Group("/admin", authMiddleware, middleware.RequireRole(models.RoleAdmin))
-		{
-			admin.Any("/*path", func(c *gin.Context) {
-				c.Status(http.StatusNotImplemented)
-			})
-		}
-	}
+	// API Group V2 (Future evolution placeholder)
+	v2 := r.Group("/api/v2")
+	registerV2Routes(v2)
 
 	// Swagger Placeholder API endpoint
 	r.GET("/swagger/*any", func(c *gin.Context) {
@@ -119,4 +77,69 @@ func SetupRouter(
 	})
 
 	return r
+}
+
+// registerV1Routes registers version 1 endpoints.
+func registerV1Routes(
+	api *gin.RouterGroup,
+	authMiddleware gin.HandlerFunc,
+	healthHandler *handler.HealthHandler,
+	linkHandler *handler.LinkHandler,
+	userHandler *handler.UserHandler,
+	authHandler *handler.AuthHandler,
+	analyticsHandler *handler.AnalyticsHandler,
+) {
+	// Authentication Routes Group
+	auth := api.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.Refresh)
+		auth.POST("/logout", authMiddleware, authHandler.Logout)
+		auth.GET("/sessions", authMiddleware, authHandler.GetSessions)
+		auth.POST("/logout-all", authMiddleware, authHandler.LogoutAll)
+	}
+
+	// User Profile Routes Group
+	users := api.Group("/users")
+	{
+		// Protected user current profile lookup
+		users.GET("/me", authMiddleware, userHandler.Me)
+	}
+
+	// Shortened Links Routes Group (Fully authenticated for CRUD operations)
+	links := api.Group("/links", authMiddleware)
+	{
+		links.POST("", linkHandler.Create)
+		links.GET("", linkHandler.List)
+		links.GET("/:id", linkHandler.Get)
+		links.PATCH("/:id", linkHandler.Update)
+		links.DELETE("/:id", linkHandler.Delete)
+		links.GET("/:id/stats", linkHandler.GetStats)
+		links.GET("/:id/analytics", analyticsHandler.GetLinkAnalytics)
+	}
+
+	// Analytics Routes Group (Fully authenticated for metrics dashboard)
+	analytics := api.Group("/analytics", authMiddleware)
+	{
+		analytics.GET("/overview", analyticsHandler.GetOverview)
+		analytics.GET("/clicks", analyticsHandler.GetClicksOverTime)
+		analytics.GET("/top-links", analyticsHandler.GetTopLinks)
+		analytics.GET("/devices", analyticsHandler.GetDeviceDistribution)
+		analytics.GET("/browsers", analyticsHandler.GetBrowserDistribution)
+		analytics.GET("/referrers", analyticsHandler.GetReferrerDistribution)
+	}
+
+	// Admin Routes Group (RBAC Protected placeholder)
+	admin := api.Group("/admin", authMiddleware, middleware.RequireRole(models.RoleAdmin))
+	{
+		admin.Any("/*path", func(c *gin.Context) {
+			c.Status(http.StatusNotImplemented)
+		})
+	}
+}
+
+// registerV2Routes registers version 2 placeholder.
+func registerV2Routes(api *gin.RouterGroup) {
+	// Future evolution endpoints go here
 }

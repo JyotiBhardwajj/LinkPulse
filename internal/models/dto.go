@@ -76,12 +76,12 @@ type LinkResponse struct {
 
 // ListLinksQuery defines filter search sorting and paging variables.
 type ListLinksQuery struct {
-	Page   int    `form:"page,default=1"`
-	Limit  int    `form:"limit,default=20"`
-	Search string `form:"search"`
-	Sort   string `form:"sort,default=created_at"`
-	Order  string `form:"order,default=desc"`
-	Status string `form:"status"` // active, expired, inactive, deleted
+	Page   int    `form:"page,default=1" binding:"omitempty,min=1"`
+	Limit  int    `form:"limit,default=20" binding:"omitempty,min=1,max=100"`
+	Search string `form:"search" binding:"omitempty,max=255"`
+	Sort   string `form:"sort,default=created_at" binding:"omitempty,oneof=created_at updated_at expires_at"`
+	Order  string `form:"order,default=desc" binding:"omitempty,oneof=asc desc"`
+	Status string `form:"status" binding:"omitempty,oneof=active expired inactive deleted"`
 }
 
 // PaginationResponse represents a generic paginated output envelope.
@@ -198,4 +198,77 @@ type SessionResponse struct {
 	LastUsed       time.Time `json:"last_used"`
 	CreatedAt      time.Time `json:"created_at"`
 	CurrentSession bool      `json:"current_session"`
+}
+
+// ValidationError represents validation error details per field.
+type ValidationError struct {
+	Field   string `json:"field" example:"email"`
+	Rule    string `json:"rule" example:"required"`
+	Message string `json:"message" example:"The email field is required"`
+}
+
+// ErrorDetails defines backward compatible error properties.
+type ErrorDetails struct {
+	Code    string `json:"code" example:"INVALID_CREDENTIALS"`
+	Message string `json:"message" example:"Invalid email or password"`
+}
+
+// SuccessResponse defines standard JSON wrapper.
+type SuccessResponse struct {
+	Success   bool        `json:"success" example:"true"`
+	Message   string      `json:"message,omitempty" example:"Operation completed successfully"`
+	Data      interface{} `json:"data,omitempty"`
+	RequestID string      `json:"request_id,omitempty" example:"uuid-request-id"`
+}
+
+// ErrorResponse represents standardized RFC7807 problem details error payload.
+type ErrorResponse struct {
+	Success   bool          `json:"success" example:"false"`
+	Error     *ErrorDetails `json:"error"`
+	Type      string        `json:"type" example:"https://linkpulse.com/errors/invalid-credentials"`
+	Title     string        `json:"title" example:"Invalid Credentials"`
+	Status    int           `json:"status" example:"401"`
+	Detail    string        `json:"detail" example:"The email or password provided is incorrect."`
+	Instance  string        `json:"instance" example:"/api/v1/auth/login"`
+	RequestID string        `json:"request_id" example:"uuid-request-id"`
+}
+
+// ValidationErrorResponse represents validation failure payload.
+type ValidationErrorResponse struct {
+	Success   bool              `json:"success" example:"false"`
+	Error     *ErrorDetails     `json:"error"`
+	Type      string            `json:"type" example:"https://linkpulse.com/errors/validation-error"`
+	Title     string            `json:"title" example:"Validation Error"`
+	Status    int               `json:"status" example:"422"`
+	Detail    string            `json:"detail" example:"Validation failed"`
+	Instance  string            `json:"instance" example:"/api/v1/links"`
+	Details   []ValidationError `json:"details"`
+	RequestID string            `json:"request_id" example:"uuid-request-id"`
+}
+
+// PaginationMetadata represents pagination offsets and boundaries.
+type PaginationMetadata struct {
+	Page        int   `json:"page" example:"1"`
+	PageSize    int   `json:"page_size" example:"20"`
+	Total       int64 `json:"total" example:"100"`
+	TotalPages  int   `json:"total_pages" example:"5"`
+	HasNext     bool  `json:"has_next" example:"true"`
+	HasPrevious bool  `json:"has_previous" example:"false"`
+}
+
+// PaginatedResponse defines list wrappers.
+type PaginatedResponse struct {
+	Success   bool               `json:"success" example:"true"`
+	Message   string             `json:"message,omitempty" example:"Items retrieved successfully"`
+	Data      interface{}        `json:"data"`
+	Metadata  PaginationMetadata `json:"metadata"`
+	RequestID string             `json:"request_id" example:"uuid-request-id"`
+}
+
+// AnalyticsQueryRequest maps and validates range analytics parameters.
+type AnalyticsQueryRequest struct {
+	StartDate string `form:"start_date" binding:"omitempty,datetime=2006-01-02T15:04:05Z07:00"`
+	EndDate   string `form:"end_date" binding:"omitempty,datetime=2006-01-02T15:04:05Z07:00"`
+	Interval  string `form:"interval,default=day" binding:"omitempty,oneof=hour day week month"`
+	Limit     int    `form:"limit,default=10" binding:"omitempty,min=1,max=100"`
 }
