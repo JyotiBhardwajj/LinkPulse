@@ -54,3 +54,19 @@ docker-up:
 # Tear down Docker containers
 docker-down:
 	docker-compose down
+
+# Load testing commands with k6
+load-smoke:
+	k6 run loadtest/smoke.js
+
+load-baseline:
+	k6 run loadtest/baseline.js
+
+load-stress:
+	k6 run loadtest/stress.js
+
+load-spike:
+	k6 run loadtest/spike.js
+
+load-soak:
+	k6 run loadtest/soak.js

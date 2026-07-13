@@ -365,3 +365,57 @@ LinkPulse implements three independent diagnostics routes under `/health/*` desi
 ### Graceful Shutdown
 Toggling termination flags instantly flags `/health/ready` to `503`, allowing ingresses to route traffic elsewhere before existing requests are drained, background worker channels are completely processed, and SQL connection pools are safely closed.
 
+---
+
+## 10. Performance Testing & Load Validation
+
+LinkPulse includes a production-grade load testing suite powered by **Grafana k6** to validate system performance, latency distributions, and concurrency stability.
+
+### Available Load Scenarios
+
+All load testing scripts reside in the `/loadtest` directory:
+- **Smoke Test (`smoke.js`)**: Executes with a single Virtual User (VU) to verify basic API correctness and end-to-end functionality under zero load.
+- **Baseline Test (`baseline.js`)**: Simulates typical production load patterns over a short duration to determine baseline performance metrics.
+- **Stress Test (`stress.js`)**: Ramps up to elevated concurrent VU levels to pinpoint bottlenecks, evaluate connection pool limits, and locate resource limits.
+- **Spike Test (`spike.js`)**: Floods the application with a high volume of traffic within seconds to verify system resilience and rapid autoscaling recovery.
+- **Soak Test (`soak.js`)**: Sustains continuous load over an extended period to identify memory leaks, database connection leakage, or log accumulation issues.
+
+### Running the Load Tests
+
+Verify that your application is running locally (e.g. `make run` or inside Docker), then trigger k6 tests via the following `make` recipes:
+
+```bash
+# Run smoke validation
+make load-smoke
+
+# Run baseline profile
+make load-baseline
+
+# Run stress verification
+make load-stress
+
+# Run spike resilience test
+make load-spike
+
+# Run soak memory test
+make load-soak
+```
+
+### Configuration & Environment Variables
+
+You can configure the target server URL using the `BASE_URL` environment variable:
+```bash
+BASE_URL=https://linkpulse-production.up.railway.app k6 run loadtest/smoke.js
+```
+
+### Interpreting Reports & Thresholds
+
+Each load test verifies the following performance parameters under strict **SLA Thresholds**:
+1. **HTTP Error Rate**: Under 1.0% (`rate < 0.01`).
+2. **HTTP Latency**: 95% of requests must complete under 500ms (`p(95) < 500`), and 99% under 1000ms (`p(99) < 1000`).
+
+Upon execution, the test suite generates two artifacts in the `loadtest/` directory:
+- **`loadtest/summary.json`**: Machine-readable JSON summary of metrics, throughput, latency distributions, and SLA check status.
+- **`loadtest/report.html`**: A clean, responsive HTML report showcasing latency, total requests, throughput (RPS), and error percentages.
+
+
