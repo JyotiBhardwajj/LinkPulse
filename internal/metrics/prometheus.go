@@ -1,3 +1,4 @@
+// Package metrics provides observability and monitoring backed by Prometheus.
 package metrics
 
 import (
@@ -46,6 +47,11 @@ type prometheusMetrics struct {
 
 	// DB metrics
 	dbQueryDur *prometheus.HistogramVec
+
+	// Day 10 health metrics
+	healthCheckDur prometheus.Histogram
+	readinessState prometheus.Gauge
+	startupDur     prometheus.Gauge
 }
 
 var (
@@ -262,6 +268,34 @@ func NewPrometheusMetrics(namespace, subsystem string) (Metrics, *prometheus.Reg
 			},
 			[]string{"repository", "operation"},
 		),
+
+		healthCheckDur: prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "health_check_duration_seconds",
+				Help:      "Duration of dependency health checks in seconds.",
+				Buckets:   []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
+			},
+		),
+
+		readinessState: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "readiness_state",
+				Help:      "Current readiness status of the application (1 for ready, 0 for not ready).",
+			},
+		),
+
+		startupDur: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "startup_duration_seconds",
+				Help:      "Application boot/startup completion latency in seconds.",
+			},
+		),
 	}
 
 	// Register collectors on the dedicated registry instance
@@ -287,6 +321,9 @@ func NewPrometheusMetrics(namespace, subsystem string) (Metrics, *prometheus.Reg
 		pm.analyticsWrites,
 		pm.analyticsErrors,
 		pm.dbQueryDur,
+		pm.healthCheckDur,
+		pm.readinessState,
+		pm.startupDur,
 	)
 
 	return pm, reg
@@ -374,6 +411,22 @@ func (p *prometheusMetrics) RecordAnalyticsWrite() {
 
 func (p *prometheusMetrics) RecordAnalyticsError() {
 	p.analyticsErrors.Inc()
+}
+
+func (p *prometheusMetrics) RecordHealthCheckDuration(duration time.Duration) {
+	p.healthCheckDur.Observe(duration.Seconds())
+}
+
+func (p *prometheusMetrics) RecordReadinessState(ready bool) {
+	if ready {
+		p.readinessState.Set(1)
+	} else {
+		p.readinessState.Set(0)
+	}
+}
+
+func (p *prometheusMetrics) RecordStartupDuration(duration time.Duration) {
+	p.startupDur.Set(duration.Seconds())
 }
 
 func (p *prometheusMetrics) HTTPHandler() http.Handler {

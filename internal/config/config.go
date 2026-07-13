@@ -71,17 +71,27 @@ type MetricsConfig struct {
 	MetricsSubsystem string `mapstructure:"METRICS_SUBSYSTEM"`
 }
 
+// LifecycleConfig stores timeouts for diagnostic checking and graceful shut down steps.
+type LifecycleConfig struct {
+	HealthTimeout   time.Duration `mapstructure:"HEALTH_TIMEOUT"`
+	StartupTimeout  time.Duration `mapstructure:"STARTUP_TIMEOUT"`
+	ShutdownTimeout time.Duration `mapstructure:"SHUTDOWN_TIMEOUT"`
+	DatabaseTimeout time.Duration `mapstructure:"DATABASE_TIMEOUT"`
+	RedisTimeout    time.Duration `mapstructure:"REDIS_TIMEOUT"`
+}
+
 // Config is the top-level configuration container for LinkPulse.
 type Config struct {
-	Server   ServerConfig   `mapstructure:",squash"`
-	Database DatabaseConfig `mapstructure:",squash"`
-	Redis    RedisConfig    `mapstructure:",squash"`
-	Cache    CacheConfig    `mapstructure:",squash"`
-	JWT      JWTConfig      `mapstructure:",squash"`
-	Worker   WorkerConfig   `mapstructure:",squash"`
-	Cleanup  CleanupConfig  `mapstructure:",squash"`
-	Metrics  MetricsConfig  `mapstructure:",squash"`
-	LogLevel string         `mapstructure:"LOG_LEVEL"`
+	Server    ServerConfig    `mapstructure:",squash"`
+	Database  DatabaseConfig  `mapstructure:",squash"`
+	Redis     RedisConfig     `mapstructure:",squash"`
+	Cache     CacheConfig     `mapstructure:",squash"`
+	JWT       JWTConfig       `mapstructure:",squash"`
+	Worker    WorkerConfig    `mapstructure:",squash"`
+	Cleanup   CleanupConfig   `mapstructure:",squash"`
+	Metrics   MetricsConfig   `mapstructure:",squash"`
+	Lifecycle LifecycleConfig `mapstructure:",squash"`
+	LogLevel  string          `mapstructure:"LOG_LEVEL"`
 }
 
 // Validate checks that all configuration parameters satisfy range constraints.
@@ -140,6 +150,22 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Lifecycle.HealthTimeout <= 0 {
+		c.Lifecycle.HealthTimeout = 5 * time.Second
+	}
+	if c.Lifecycle.StartupTimeout <= 0 {
+		c.Lifecycle.StartupTimeout = 30 * time.Second
+	}
+	if c.Lifecycle.ShutdownTimeout <= 0 {
+		c.Lifecycle.ShutdownTimeout = 30 * time.Second
+	}
+	if c.Lifecycle.DatabaseTimeout <= 0 {
+		c.Lifecycle.DatabaseTimeout = 5 * time.Second
+	}
+	if c.Lifecycle.RedisTimeout <= 0 {
+		c.Lifecycle.RedisTimeout = 5 * time.Second
+	}
+
 	return nil
 }
 
@@ -181,6 +207,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("ENABLE_METRICS", true)
 	viper.SetDefault("METRICS_NAMESPACE", "linkpulse")
 	viper.SetDefault("METRICS_SUBSYSTEM", "api")
+
+	// Day 10 Lifecycle defaults
+	viper.SetDefault("HEALTH_TIMEOUT", "5s")
+	viper.SetDefault("STARTUP_TIMEOUT", "30s")
+	viper.SetDefault("SHUTDOWN_TIMEOUT", "30s")
+	viper.SetDefault("DATABASE_TIMEOUT", "5s")
+	viper.SetDefault("REDIS_TIMEOUT", "5s")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env is missing in production since environment variables may be injected directly.

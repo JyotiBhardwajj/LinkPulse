@@ -46,6 +46,9 @@ func (s *spyMetrics) RecordLinkDeleted()                                        
 func (s *spyMetrics) RecordLinkResolved()                                                {}
 func (s *spyMetrics) RecordAnalyticsWrite()                                              {}
 func (s *spyMetrics) RecordAnalyticsError()                                              {}
+func (s *spyMetrics) RecordHealthCheckDuration(duration time.Duration)                   {}
+func (s *spyMetrics) RecordReadinessState(ready bool)                                    {}
+func (s *spyMetrics) RecordStartupDuration(duration time.Duration)                       {}
 
 func TestMetricsMiddleware_RouteMapping(t *testing.T) {
 	gin.SetMode(gin.TestMode)

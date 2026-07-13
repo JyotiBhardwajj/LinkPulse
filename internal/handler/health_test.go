@@ -3,125 +3,128 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"linkpulse/internal/models"
+	"linkpulse/internal/health"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type mockReadinessService struct {
-	resp *models.ReadyResponse
-	err  error
+type mockHealthService struct {
+	live    bool
+	ready   health.HealthResponse
+	readyOk bool
+	startup bool
 }
 
-func (m *mockReadinessService) Check(ctx context.Context) (*models.ReadyResponse, error) {
-	return m.resp, m.err
+func (m *mockHealthService) Register(checker health.Checker) {}
+func (m *mockHealthService) CheckAll(ctx context.Context) health.HealthResponse {
+	return m.ready
 }
+func (m *mockHealthService) Live() bool {
+	return m.live
+}
+func (m *mockHealthService) Ready(ctx context.Context) (health.HealthResponse, bool) {
+	return m.ready, m.readyOk
+}
+func (m *mockHealthService) Startup() bool {
+	return m.startup
+}
+func (m *mockHealthService) SetStartupComplete() {}
 
-func TestHealthHandler_Check(t *testing.T) {
+func TestHealthHandler_Live(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	mockSvc := &mockReadinessService{}
+	mockSvc := &mockHealthService{live: true}
 	h := NewHealthHandler(mockSvc, "1.2.3", "commit-hash", "build-time", "production")
 
 	r := gin.New()
-	r.GET("/health", h.Check)
+	r.GET("/health/live", h.Live)
 
-	req, _ := http.NewRequest("GET", "/health", nil)
+	req, _ := http.NewRequest("GET", "/health/live", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var resp struct {
-		Success bool                  `json:"success"`
-		Message string                `json:"message"`
-		Data    models.HealthResponse `json:"data"`
+		Status    string `json:"status"`
+		Timestamp string `json:"timestamp"`
+		Version   string `json:"version"`
 	}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.True(t, resp.Success)
-	assert.Equal(t, "healthy", resp.Data.Status)
-	assert.Equal(t, "1.2.3", resp.Data.Version)
-	// Assert git commit is truncated to short SHA (first 7 characters)
-	assert.Equal(t, "commit-", resp.Data.GitCommit)
+	assert.Equal(t, "healthy", resp.Status)
+	assert.Equal(t, "1.2.3", resp.Version)
 }
 
-func TestHealthHandler_CheckReady_Success(t *testing.T) {
+func TestHealthHandler_Ready_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	readyResp := &models.ReadyResponse{
-		Status:     "ready",
-		Database:   "up",
-		Redis:      "up",
-		WorkerPool: "up",
-		Timestamp:  time.Now().UTC(),
+	readyResp := health.HealthResponse{
+		Status: "healthy",
+		Checks: []health.DependencyResult{
+			{Name: "postgres", Status: "healthy", Critical: true},
+			{Name: "redis", Status: "healthy", Critical: false},
+		},
 	}
 
-	mockSvc := &mockReadinessService{
-		resp: readyResp,
-		err:  nil,
+	mockSvc := &mockHealthService{
+		ready:   readyResp,
+		readyOk: true,
 	}
 	h := NewHealthHandler(mockSvc, "1.2.3", "commit-hash", "build-time", "production")
 
 	r := gin.New()
-	r.GET("/ready", h.CheckReady)
+	r.GET("/health/ready", h.Ready)
 
-	req, _ := http.NewRequest("GET", "/ready", nil)
+	req, _ := http.NewRequest("GET", "/health/ready", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp models.ReadyResponse
+	var resp health.HealthResponse
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "ready", resp.Status)
-	assert.Equal(t, "up", resp.Database)
-	assert.Equal(t, "up", resp.Redis)
-	assert.Equal(t, "up", resp.WorkerPool)
+	assert.Equal(t, "healthy", resp.Status)
+	assert.Equal(t, 2, len(resp.Checks))
 }
 
-func TestHealthHandler_CheckReady_Failure(t *testing.T) {
+func TestHealthHandler_Ready_Failure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	readyResp := &models.ReadyResponse{
-		Status:     "not_ready",
-		Database:   "down",
-		Redis:      "up",
-		WorkerPool: "up",
-		Timestamp:  time.Now().UTC(),
+	unhealthyResp := health.HealthResponse{
+		Status: "unhealthy",
+		Checks: []health.DependencyResult{
+			{Name: "postgres", Status: "unhealthy", Critical: true, Error: "db failed"},
+		},
 	}
 
-	mockSvc := &mockReadinessService{
-		resp: readyResp,
-		err:  errors.New("postgres connection failed"),
+	mockSvc := &mockHealthService{
+		ready:   unhealthyResp,
+		readyOk: false,
 	}
 	h := NewHealthHandler(mockSvc, "1.2.3", "commit-hash", "build-time", "production")
 
 	r := gin.New()
-	r.GET("/ready", h.CheckReady)
+	r.GET("/health/ready", h.Ready)
 
-	req, _ := http.NewRequest("GET", "/ready", nil)
+	req, _ := http.NewRequest("GET", "/health/ready", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 
-	var resp models.ReadyResponse
+	var resp health.HealthResponse
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "not_ready", resp.Status)
-	assert.Equal(t, "down", resp.Database)
-	assert.Equal(t, "up", resp.Redis)
+	assert.Equal(t, "unhealthy", resp.Status)
 }

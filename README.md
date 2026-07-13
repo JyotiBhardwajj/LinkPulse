@@ -339,13 +339,29 @@ curl -X POST http://localhost:8080/api/v1/links \
 
 - **`cmd/`**: houses main entrypoint definitions.
 - **`deploy/`**: configuration mappings for monitoring engines (Prometheus / Grafana).
-- **`docs/`**: API developer specification manuals (errors, pagination, examples, OpenAPI JSON).
+- **`docs/`**: API developer specification manuals (errors, pagination, examples, OpenAPI JSON, production).
 - **`internal/app/`**: application initialization and dependency wiring.
 - **`internal/config/`**: application environment structure setups.
 - **`internal/database/`**: GORM driver initializations and plugins.
+- **`internal/health/`**: parallel checker definitions and readiness states.
 - **`internal/models/`**: schemas entities and structures properties.
 - **`internal/repository/`**: persistence logic.
 - **`internal/service/`**: core business rules logic.
 - **`internal/handler/`**: payload binders and output formatters.
 - **`internal/middleware/`**: routing filters chain.
 - **`internal/utils/`**: helper functionalities (base62, hashing, response builders, validator realignments, ETags).
+
+---
+
+## 9. Production Operational Design
+
+### Diagnostic Probes
+LinkPulse implements three independent diagnostics routes under `/health/*` designed for container probe orchestrations.
+
+1. **Liveness Probe** (`/health/live`): Check process execution. Returns `200` under active operations.
+2. **Readiness Probe** (`/health/ready`): Check operational state of critical systems (`postgres`, `worker_pool`, `config`). Optional failures (`redis`, `metrics`) degrade the status response but continue to return `HTTP 200` to prevent unnecessary traffic interruption.
+3. **Startup Probe** (`/health/startup`): Check bootstrapping. Returns `200` after migrations are verified and services have initialized.
+
+### Graceful Shutdown
+Toggling termination flags instantly flags `/health/ready` to `503`, allowing ingresses to route traffic elsewhere before existing requests are drained, background worker channels are completely processed, and SQL connection pools are safely closed.
+

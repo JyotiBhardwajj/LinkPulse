@@ -16,6 +16,7 @@ import (
 	"linkpulse/internal/config"
 	"linkpulse/internal/database"
 	"linkpulse/internal/handler"
+	"linkpulse/internal/health"
 	"linkpulse/internal/logger"
 	"linkpulse/internal/metrics"
 	"linkpulse/internal/repository"
@@ -33,10 +34,16 @@ type Application struct {
 	workerPool       worker.WorkerPool
 	cleanupScheduler *worker.CleanupScheduler
 	auditLogger      logger.AsyncAuditLogger
+	healthSvc        health.HealthService
+	readinessState   *health.ReadinessState
+	metricsTracker   metrics.Metrics
+	startTime        time.Time
 }
 
 // NewApplication instantiates all components and connects to external stores.
 func NewApplication() (*Application, error) {
+	appStartTime := time.Now()
+
 	// 1. Load config
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -133,19 +140,22 @@ func NewApplication() (*Application, error) {
 	)
 	analyticsService := service.NewAnalyticsService(repoMgr.Analytics(), repoMgr.Links(), metricsTracker)
 
-	// Initialize ReadinessService with parallel checker map
-	checkers := map[string]service.ReadinessChecker{
-		"database":    db,
-		"redis":       redisClient,
-		"worker_pool": workerPool,
-	}
-	readyService := service.NewReadinessService(checkers)
+	// Initialize health checker components
+	readinessState := health.NewReadinessState(metricsTracker)
+	healthSvc := health.NewHealthService(readinessState, cfg.Server.Version, cfg.Lifecycle.HealthTimeout, metricsTracker)
+
+	// Register checkers
+	healthSvc.Register(health.NewPostgresChecker(db))
+	healthSvc.Register(health.NewRedisChecker(redisClient))
+	healthSvc.Register(health.NewWorkerPoolChecker(workerPool))
+	healthSvc.Register(health.NewMetricsChecker(metricsTracker))
+	healthSvc.Register(health.NewConfigChecker(cfg))
 
 	// 11. Initialize CleanupScheduler
 	cleanupScheduler := worker.NewCleanupScheduler(linkService, cfg.Cleanup.Interval)
 
 	// 12. Initialize Handlers
-	healthHandler := handler.NewHealthHandler(readyService, cfg.Server.Version, cfg.Server.GitCommit, cfg.Server.BuildTime, cfg.Server.Env)
+	healthHandler := handler.NewHealthHandler(healthSvc, cfg.Server.Version, cfg.Server.GitCommit, cfg.Server.BuildTime, cfg.Server.Env)
 	linkHandler := handler.NewLinkHandler(linkService, workerPool)
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(authService)
@@ -172,6 +182,10 @@ func NewApplication() (*Application, error) {
 		workerPool:       workerPool,
 		cleanupScheduler: cleanupScheduler,
 		auditLogger:      auditLogger,
+		healthSvc:        healthSvc,
+		readinessState:   readinessState,
+		metricsTracker:   metricsTracker,
+		startTime:        appStartTime,
 	}, nil
 }
 
@@ -193,6 +207,13 @@ func (a *Application) Run() error {
 		}
 	}()
 
+	// Mark startup complete and toggle ready state
+	a.healthSvc.SetStartupComplete()
+	a.readinessState.SetReady()
+	startupDur := time.Since(a.startTime)
+	a.metricsTracker.RecordStartupDuration(startupDur)
+	slog.Info("LinkPulse application startup completed successfully", "duration_ms", startupDur.Milliseconds())
+
 	// Wait for termination signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -200,18 +221,22 @@ func (a *Application) Run() error {
 
 	slog.Info("Termination signal received. Starting graceful shutdown sequence", "signal", sig.String())
 
-	// Shutdown timeout context (10 seconds)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Configure shutdown context using configured SHUTDOWN_TIMEOUT
+	ctx, cancel := context.WithTimeout(context.Background(), a.config.Lifecycle.ShutdownTimeout)
 	defer cancel()
 
-	// 1. Stop accepting HTTP requests
+	// 1. Immediately toggle readiness state to false to stop incoming load balancer traffic
+	a.readinessState.SetNotReady()
+	slog.Info("Application set to NOT ready. Preparing graceful shutdown")
+
+	// 2. Stop accepting HTTP requests (graceful Shutdown on HTTP server wrapper)
 	if err := a.httpServer.Shutdown(ctx); err != nil {
 		slog.Error("HTTP server shutdown encountered an error", "error", err)
 	} else {
 		slog.Info("HTTP server stopped accepting new requests")
 	}
 
-	// 2. Close Async Audit Logger (drains all remaining logs)
+	// 3. Close Async Audit Logger (drains all remaining logs)
 	if err := a.auditLogger.Close(ctx); err != nil {
 		slog.Error("Error closing audit logger gracefully", "error", err)
 	} else {
@@ -221,28 +246,28 @@ func (a *Application) Run() error {
 	// Stop background cleanup ticker
 	a.cleanupScheduler.Stop()
 
-	// 3. Drain Worker Pool (waits for queued events to flush to PostgreSQL)
+	// 4. Drain Worker Pool (waits for queued events to flush to PostgreSQL)
 	if err := a.workerPool.Shutdown(ctx); err != nil {
 		slog.Error("Worker pool shutdown encountered an error", "error", err)
 	} else {
 		slog.Info("Worker pool gracefully drained and stopped")
 	}
 
-	// 4. Close Redis connections
+	// 5. Close Redis connections
 	if err := a.redis.Close(); err != nil {
 		slog.Error("Error closing Redis client connection", "error", err)
 	} else {
 		slog.Info("Redis connection client closed successfully")
 	}
 
-	// 5. Close PostgreSQL connections (after worker pool has completed GORM inserts)
+	// 6. Close PostgreSQL connections (after worker pool has completed GORM inserts)
 	if err := a.db.Close(); err != nil {
 		slog.Error("Error closing PostgreSQL connection pool", "error", err)
 	} else {
 		slog.Info("PostgreSQL connection pool closed successfully")
 	}
 
-	// 6. Flush Logger
+	// 7. Flush Logger
 	slog.Info("Graceful shutdown completed. Exiting safely.")
 	return nil
 }

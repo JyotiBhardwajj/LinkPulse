@@ -26,6 +26,11 @@ type Metrics interface {
 	RecordLinkResolved()
 	RecordAnalyticsWrite()
 	RecordAnalyticsError()
+
+	// Day 10 extensions
+	RecordHealthCheckDuration(duration time.Duration)
+	RecordReadinessState(ready bool)
+	RecordStartupDuration(duration time.Duration)
 }
 
 type noOpMetrics struct{}
@@ -56,3 +61,7 @@ func (m *noOpMetrics) RecordLinkDeleted()                                       
 func (m *noOpMetrics) RecordLinkResolved()                                                {}
 func (m *noOpMetrics) RecordAnalyticsWrite()                                              {}
 func (m *noOpMetrics) RecordAnalyticsError()                                              {}
+
+func (m *noOpMetrics) RecordHealthCheckDuration(duration time.Duration) {}
+func (m *noOpMetrics) RecordReadinessState(ready bool)                  {}
+func (m *noOpMetrics) RecordStartupDuration(duration time.Duration)     {}

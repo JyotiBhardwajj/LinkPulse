@@ -15,7 +15,7 @@ func Logger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 
-		if path == "/metrics" {
+		if path == "/metrics" || path == "/health" || path == "/ready" || (len(path) >= 8 && path[:8] == "/health/") {
 			c.Next()
 			return
 		}

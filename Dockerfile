@@ -41,7 +41,7 @@ USER appuser
 
 # Healthcheck instruction using curl on liveness endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost:8080/health/live || exit 1
 
 # Expose server port
 EXPOSE 8080

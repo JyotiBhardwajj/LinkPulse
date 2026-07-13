@@ -152,6 +152,8 @@ func (p *workerPool) workerLoop(ctx context.Context, workerID int) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-p.stopChan:
 			// Draining remaining items in channel after close
 			for event := range p.queue {

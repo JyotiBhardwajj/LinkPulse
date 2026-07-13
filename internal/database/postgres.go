@@ -56,16 +56,16 @@ func NewPostgresDB(cfg config.DatabaseConfig) (*PostgresDB, error) {
 }
 
 // Ping verifies the database connection remains active.
-func (p *PostgresDB) Ping() error {
+func (p *PostgresDB) Ping(ctx context.Context) error {
 	if p.sqlDB == nil {
 		return fmt.Errorf("database connection not initialized")
 	}
-	return p.sqlDB.Ping()
+	return p.sqlDB.PingContext(ctx)
 }
 
 // Ready satisfies the ReadinessChecker interface.
 func (p *PostgresDB) Ready(ctx context.Context) error {
-	return p.Ping()
+	return p.Ping(ctx)
 }
 
 // Close gracefully releases the database connection pool resources.

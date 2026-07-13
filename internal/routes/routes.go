@@ -8,7 +8,6 @@ import (
 	"linkpulse/internal/handler"
 	"linkpulse/internal/metrics"
 	"linkpulse/internal/middleware"
-	"linkpulse/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,48 +26,70 @@ func SetupRouter(
 ) *gin.Engine {
 	// Disable Gin default logging to use our structured slog middleware
 	gin.SetMode(gin.ReleaseMode)
+
 	r := gin.New()
 
-	// Apply Middlewares in correct order
+	// Apply globally safe Middlewares
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recovery())
-	if metricsTracker != nil {
-		r.Use(middleware.MetricsMiddleware(metricsTracker))
-	}
-	r.Use(middleware.Logger())
-	r.Use(middleware.Timeout(timeoutDuration))
 	r.Use(middleware.CORS())
-	r.Use(middleware.RateLimit())
 
-	// Diagnostic Endpoints
-	r.GET("/health", healthHandler.Check)
-	r.GET("/ready", healthHandler.CheckReady)
+	// Diagnostic Endpoints (no logging, timeout, rate limiting, or metrics)
+	healthGroup := r.Group("/health")
+	healthGroup.Use(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+	{
+		healthGroup.GET("/live", healthHandler.Live)
+		healthGroup.GET("/ready", healthHandler.Ready)
+		healthGroup.GET("/startup", healthHandler.Startup)
+	}
+
+	// For backward compatibility:
+	r.GET("/health", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		healthHandler.Live(c)
+	})
+	r.GET("/ready", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		healthHandler.Ready(c)
+	})
+
+	// Create a sub-group for all other application routes that require standard middlewares
+	mainGroup := r.Group("/")
+	if metricsTracker != nil {
+		mainGroup.Use(middleware.MetricsMiddleware(metricsTracker))
+	}
+	mainGroup.Use(middleware.Logger())
+	mainGroup.Use(middleware.Timeout(timeoutDuration))
+	mainGroup.Use(middleware.RateLimit())
 
 	if metricsTracker != nil {
 		if exposer, ok := metricsTracker.(interface{ HTTPHandler() http.Handler }); ok {
-			r.GET("/metrics", gin.WrapH(exposer.HTTPHandler()))
+			mainGroup.GET("/metrics", gin.WrapH(exposer.HTTPHandler()))
 		}
 	}
 
 	// Redirect Endpoint (Optimized path)
-	r.GET("/r/:code", linkHandler.Resolve)
+	mainGroup.GET("/r/:code", linkHandler.Resolve)
 
 	// Static Swagger spec file
-	r.StaticFile("/docs/swagger.json", "./docs/swagger.json")
+	mainGroup.StaticFile("/docs/swagger.json", "./docs/swagger.json")
 
 	// Instantiate authorization middleware wrapper
 	authMiddleware := middleware.Auth(jwtSecret, jwtIssuer)
 
 	// API Group V1
-	v1 := r.Group("/api/v1")
+	v1 := mainGroup.Group("/api/v1")
 	registerV1Routes(v1, authMiddleware, healthHandler, linkHandler, userHandler, authHandler, analyticsHandler)
 
 	// API Group V2 (Future evolution placeholder)
-	v2 := r.Group("/api/v2")
+	v2 := mainGroup.Group("/api/v2")
 	registerV2Routes(v2)
 
 	// Swagger Placeholder API endpoint
-	r.GET("/swagger/*any", func(c *gin.Context) {
+	mainGroup.GET("/swagger/*any", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message":     "Swagger UI Placeholder. Run 'make swagger' to compile and generate Swagger docs.",
 			"doc_version": "1.0.0",
@@ -124,22 +145,10 @@ func registerV1Routes(
 	{
 		analytics.GET("/overview", analyticsHandler.GetOverview)
 		analytics.GET("/clicks", analyticsHandler.GetClicksOverTime)
-		analytics.GET("/top-links", analyticsHandler.GetTopLinks)
-		analytics.GET("/devices", analyticsHandler.GetDeviceDistribution)
-		analytics.GET("/browsers", analyticsHandler.GetBrowserDistribution)
-		analytics.GET("/referrers", analyticsHandler.GetReferrerDistribution)
-	}
-
-	// Admin Routes Group (RBAC Protected placeholder)
-	admin := api.Group("/admin", authMiddleware, middleware.RequireRole(models.RoleAdmin))
-	{
-		admin.Any("/*path", func(c *gin.Context) {
-			c.Status(http.StatusNotImplemented)
-		})
 	}
 }
 
-// registerV2Routes registers version 2 placeholder.
+// registerV2Routes registers version 2 placeholder endpoints.
 func registerV2Routes(api *gin.RouterGroup) {
-	// Future evolution endpoints go here
+	// Placeholder for future endpoints
 }

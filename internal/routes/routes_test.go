@@ -10,14 +10,12 @@ import (
 	"time"
 
 	"linkpulse/internal/handler"
+	"linkpulse/internal/health"
 	"linkpulse/internal/metrics"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
-
-type mockLinkService struct{}
-type mockWorkerPool struct{}
 
 func TestRouterConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -30,11 +28,10 @@ func TestRouterConfiguration(t *testing.T) {
 	err = os.WriteFile(filepath.Join("docs", "swagger.json"), []byte(`{"openapi": "3.0.3"}`), 0644)
 	assert.NoError(t, err)
 
-	// Temporarily override working directory relative path to find swagger.json or mock it.
-	// Since routes.go uses "./docs/swagger.json", we will write to the actual local folder, or mock it by writing to ./docs/swagger.json if it doesn't exist.
-	// Wait, ./docs/swagger.json already exists in our workspace! So SetupRouter will find it!
-
-	healthH := handler.NewHealthHandler(nil, "1.0.0", "gitcommit", "2026-07-13", "development")
+	m := metrics.NewNoOpMetrics()
+	rs := health.NewReadinessState(m)
+	hs := health.NewHealthService(rs, "1.0.0", 50*time.Millisecond, m)
+	healthH := handler.NewHealthHandler(hs, "1.0.0", "gitcommit", "2026-07-13", "development")
 
 	r := SetupRouter(
 		time.Second,
@@ -45,12 +42,43 @@ func TestRouterConfiguration(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		metrics.NewNoOpMetrics(),
+		m,
 	)
 
-	t.Run("GET /health - success", func(t *testing.T) {
+	t.Run("GET /health/live - success", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/health", nil)
+		req, _ := http.NewRequest("GET", "/health/live", nil)
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "healthy")
+	})
+
+	t.Run("GET /health/ready - 503 before ready set", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/health/ready", nil)
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	})
+
+	t.Run("GET /health/ready - 200 after ready set", func(t *testing.T) {
+		rs.SetReady()
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/health/ready", nil)
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("GET /health/startup - 503 before startupComplete", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/health/startup", nil)
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	})
+
+	t.Run("GET /health/startup - 200 after startupComplete", func(t *testing.T) {
+		hs.SetStartupComplete()
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/health/startup", nil)
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
