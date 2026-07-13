@@ -65,14 +65,11 @@ func NewApplication() (*Application, error) {
 		return nil, fmt.Errorf("postgres error: %w", err)
 	}
 
-	// 5. Verify PostgreSQL migrations are applied
-	tables := []string{"users", "links", "analytics", "refresh_tokens"}
-	for _, table := range tables {
-		if !db.DB.Migrator().HasTable(table) {
-			_ = db.Close()
-			_ = auditLogger.Close(context.Background())
-			return nil, fmt.Errorf("migration verification failed: table '%s' is missing", table)
-		}
+	// 5. Run SQL migrations before any repository or service initialization
+	if err := db.RunMigrations("migrations"); err != nil {
+		_ = db.Close()
+		_ = auditLogger.Close(context.Background())
+		return nil, fmt.Errorf("migration error: %w", err)
 	}
 
 	// 6. Connect to Redis

@@ -30,6 +30,9 @@ RUN apk add --no-cache ca-certificates curl
 # Copy the built binary from builder stage
 COPY --from=builder /app/linkpulse .
 
+# Copy SQL migration files so the runtime can apply them on startup
+COPY --from=builder /app/migrations ./migrations
+
 # Copy environment template
 COPY .env.example .env
 

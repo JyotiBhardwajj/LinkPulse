@@ -4,12 +4,16 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"linkpulse/internal/config"
 
+	"github.com/golang-migrate/migrate/v4"
+	migratepgx "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file" // file source driver
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -53,6 +57,39 @@ func NewPostgresDB(cfg config.DatabaseConfig) (*PostgresDB, error) {
 		DB:    db,
 		sqlDB: sqlDB,
 	}, nil
+}
+
+// RunMigrations executes SQL migration files from the given directory path.
+// It uses golang-migrate with the file:// source driver.
+// ErrNoChange is silently ignored — all other errors fail startup immediately.
+func (p *PostgresDB) RunMigrations(migrationsPath string) error {
+	slog.Info("Running SQL migrations", "path", migrationsPath)
+
+	driver, err := migratepgx.WithInstance(p.sqlDB, &migratepgx.Config{})
+	if err != nil {
+		return fmt.Errorf("failed to create migrate postgres driver: %w", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsPath,
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize migrate instance: %w", err)
+	}
+
+	if err := m.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			slog.Info("SQL migrations: no new migrations to apply")
+			return nil
+		}
+		return fmt.Errorf("failed to apply migrations: %w", err)
+	}
+
+	version, dirty, _ := m.Version()
+	slog.Info("SQL migrations applied successfully", "version", version, "dirty", dirty)
+	return nil
 }
 
 // Ping verifies the database connection remains active.
