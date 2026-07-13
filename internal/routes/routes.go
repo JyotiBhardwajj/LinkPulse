@@ -30,6 +30,7 @@ func SetupRouter(
 	r := gin.New()
 
 	// Apply globally safe Middlewares
+	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS())
