@@ -33,10 +33,10 @@ type DatabaseConfig struct {
 
 // RedisConfig stores Redis connection coordinates.
 type RedisConfig struct {
-    Host     string `mapstructure:"REDIS_HOST"`
-    Port     string `mapstructure:"REDIS_PORT"`
-    User     string `mapstructure:"REDIS_USER"`
-    Password string `mapstructure:"REDIS_PASSWORD"`
+	Host     string `mapstructure:"REDIS_HOST"`
+	Port     string `mapstructure:"REDIS_PORT"`
+	User     string `mapstructure:"REDIS_USER"`
+	Password string `mapstructure:"REDIS_PASSWORD"`
 }
 
 // CacheConfig stores cache-specific settings.
@@ -192,7 +192,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("REDIS_HOST", "localhost")
 	viper.SetDefault("REDIS_PORT", "6379")
 	viper.SetDefault("REDIS_USER", "default")
-    viper.SetDefault("REDIS_PASSWORD", "")
+	viper.SetDefault("REDIS_PASSWORD", "")
 	viper.SetDefault("CACHE_TTL", "24h")
 	viper.SetDefault("CACHE_PREFIX", "link:")
 	viper.SetDefault("WORKER_COUNT", 5)

@@ -18,16 +18,16 @@ type RedisClient struct {
 
 // NewRedisClient creates and validates a new Redis connection.
 func NewRedisClient(cfg config.RedisConfig) (*RedisClient, error) {
-    addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
 
-    client := redis.NewClient(&redis.Options{
-        Addr:     addr,
-        Username: cfg.User,
-        Password: cfg.Password,
-    })
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Username: cfg.User,
+		Password: cfg.Password,
+	})
 
-    // Verify connection
-    ctx := context.Background()
+	// Verify connection
+	ctx := context.Background()
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis at %s: %w", addr, err)
