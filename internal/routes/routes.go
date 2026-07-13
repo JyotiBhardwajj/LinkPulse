@@ -5,11 +5,15 @@ import (
 	"net/http"
 	"time"
 
+	_ "linkpulse/docs" // swag generated docs — must be blank-imported to register spec
+
 	"linkpulse/internal/handler"
 	"linkpulse/internal/metrics"
 	"linkpulse/internal/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // SetupRouter binds HTTP endpoints to handlers and registers middlewares.
@@ -89,14 +93,8 @@ func SetupRouter(
 	v2 := mainGroup.Group("/api/v2")
 	registerV2Routes(v2)
 
-	// Swagger Placeholder API endpoint
-	mainGroup.GET("/swagger/*any", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message":     "Swagger UI Placeholder. Run 'make swagger' to compile and generate Swagger docs.",
-			"doc_version": "1.0.0",
-			"spec_url":    "/docs/swagger.json",
-		})
-	})
+	// Swagger UI — served at /swagger/index.html
+	mainGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return r
 }

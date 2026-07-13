@@ -1,0 +1,855 @@
+basePath: /
+definitions:
+  linkpulse_internal_models.CreateLinkRequest:
+    properties:
+      custom_alias:
+        maxLength: 50
+        minLength: 3
+        type: string
+      expires_at:
+        type: string
+      original_url:
+        type: string
+      title:
+        maxLength: 255
+        type: string
+    required:
+    - original_url
+    type: object
+  linkpulse_internal_models.ErrorDetails:
+    properties:
+      code:
+        example: INVALID_CREDENTIALS
+        type: string
+      message:
+        example: Invalid email or password
+        type: string
+    type: object
+  linkpulse_internal_models.ErrorResponse:
+    properties:
+      detail:
+        example: The email or password provided is incorrect.
+        type: string
+      error:
+        $ref: '#/definitions/linkpulse_internal_models.ErrorDetails'
+      instance:
+        example: /api/v1/auth/login
+        type: string
+      request_id:
+        example: uuid-request-id
+        type: string
+      status:
+        example: 401
+        type: integer
+      success:
+        example: false
+        type: boolean
+      title:
+        example: Invalid Credentials
+        type: string
+      type:
+        example: https://linkpulse.com/errors/invalid-credentials
+        type: string
+    type: object
+  linkpulse_internal_models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  linkpulse_internal_models.PaginatedResponse:
+    properties:
+      data: {}
+      message:
+        example: Items retrieved successfully
+        type: string
+      metadata:
+        $ref: '#/definitions/linkpulse_internal_models.PaginationMetadata'
+      request_id:
+        example: uuid-request-id
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  linkpulse_internal_models.PaginationMetadata:
+    properties:
+      has_next:
+        example: true
+        type: boolean
+      has_previous:
+        example: false
+        type: boolean
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 100
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+    type: object
+  linkpulse_internal_models.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  linkpulse_internal_models.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        example: Operation completed successfully
+        type: string
+      request_id:
+        example: uuid-request-id
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  linkpulse_internal_models.UpdateLinkRequest:
+    properties:
+      expires_at:
+        type: string
+      is_active:
+        type: boolean
+      title:
+        maxLength: 255
+        type: string
+    type: object
+  linkpulse_internal_models.UserRegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 72
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  linkpulse_internal_models.ValidationError:
+    properties:
+      field:
+        example: email
+        type: string
+      message:
+        example: The email field is required
+        type: string
+      rule:
+        example: required
+        type: string
+    type: object
+  linkpulse_internal_models.ValidationErrorResponse:
+    properties:
+      detail:
+        example: Validation failed
+        type: string
+      details:
+        items:
+          $ref: '#/definitions/linkpulse_internal_models.ValidationError'
+        type: array
+      error:
+        $ref: '#/definitions/linkpulse_internal_models.ErrorDetails'
+      instance:
+        example: /api/v1/links
+        type: string
+      request_id:
+        example: uuid-request-id
+        type: string
+      status:
+        example: 422
+        type: integer
+      success:
+        example: false
+        type: boolean
+      title:
+        example: Validation Error
+        type: string
+      type:
+        example: https://linkpulse.com/errors/validation-error
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: JyotiBhardwajj
+    url: https://github.com/JyotiBhardwajj/LinkPulse
+  description: |-
+    Production-grade URL shortener with analytics, authentication, and observability.
+
+    ## Authentication
+    All protected endpoints require a Bearer JWT in the Authorization header.
+    Obtain tokens via POST /api/v1/auth/login.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: LinkPulse API
+  version: "1.0"
+paths:
+  /api/v1/analytics/browsers:
+    get:
+      description: Returns click counts grouped by browser (Chrome, Firefox, Safari,
+        etc.).
+      parameters:
+      - description: Start date (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Browser distribution
+      tags:
+      - analytics
+  /api/v1/analytics/clicks:
+    get:
+      description: Returns time-series click data grouped by interval for the authenticated
+        user's links.
+      parameters:
+      - description: Start date (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      - description: 'Grouping interval: hour, day, week'
+        in: query
+        name: interval
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Clicks over time
+      tags:
+      - analytics
+  /api/v1/analytics/devices:
+    get:
+      description: Returns click counts grouped by device type (mobile, desktop, tablet,
+        etc.).
+      parameters:
+      - description: Start date (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Device distribution
+      tags:
+      - analytics
+  /api/v1/analytics/overview:
+    get:
+      description: Returns aggregate statistics for all links owned by the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Analytics overview
+      tags:
+      - analytics
+  /api/v1/analytics/referrers:
+    get:
+      description: Returns click counts grouped by referrer domain.
+      parameters:
+      - description: Start date (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      - description: Max referrers to return
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Referrer distribution
+      tags:
+      - analytics
+  /api/v1/analytics/top-links:
+    get:
+      description: Returns the top N links ranked by click count for the authenticated
+        user.
+      parameters:
+      - description: Number of results (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Top performing links
+      tags:
+      - analytics
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Validates credentials and returns an access token and refresh token.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revokes the provided refresh token, ending the current device session.
+      parameters:
+      - description: Refresh token to revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout current session
+      tags:
+      - auth
+  /api/v1/auth/logout-all:
+    post:
+      description: Revokes all refresh tokens, ending all device sessions for the
+        authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout all sessions
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a valid refresh token and returns a new access token and
+        refresh token pair.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      summary: Refresh tokens
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with the given email and password.
+      parameters:
+      - description: Registration payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.UserRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /api/v1/auth/sessions:
+    get:
+      description: Returns all active device sessions for the currently authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List active sessions
+      tags:
+      - auth
+  /api/v1/links:
+    get:
+      description: Returns a paginated list of all shortened links created by the
+        authenticated user.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Search by URL or title
+        in: query
+        name: search
+        type: string
+      - description: 'Sort field: created_at, updated_at, expires_at'
+        in: query
+        name: sort
+        type: string
+      - description: 'Sort order: asc, desc'
+        in: query
+        name: order
+        type: string
+      - description: 'Filter by status: active, expired, inactive, deleted'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.PaginatedResponse'
+        "304":
+          description: Not Modified
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List links
+      tags:
+      - links
+    post:
+      consumes:
+      - application/json
+      description: Shortens a long URL and returns the short link details.
+      parameters:
+      - description: Link creation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.CreateLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create short link
+      tags:
+      - links
+  /api/v1/links/{id}:
+    delete:
+      description: Soft-deletes a shortened link. The short code will no longer resolve.
+      parameters:
+      - description: Link UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete link
+      tags:
+      - links
+    get:
+      description: Returns details of a specific shortened link owned by the authenticated
+        user.
+      parameters:
+      - description: Link UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "304":
+          description: Not Modified
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get link by ID
+      tags:
+      - links
+    patch:
+      consumes:
+      - application/json
+      description: Updates the title, expiry date, or active status of an existing
+        link.
+      parameters:
+      - description: Link UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/linkpulse_internal_models.UpdateLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update link
+      tags:
+      - links
+  /api/v1/links/{id}/analytics:
+    get:
+      description: Returns detailed time-series analytics for a specific link owned
+        by the authenticated user.
+      parameters:
+      - description: Link UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Start date (RFC3339)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (RFC3339)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Link analytics
+      tags:
+      - links
+  /api/v1/links/{id}/stats:
+    get:
+      description: Returns total click count and basic metrics for a specific shortened
+        link.
+      parameters:
+      - description: Link UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get link statistics
+      tags:
+      - links
+  /api/v1/users/me:
+    get:
+      description: Returns the profile information of the currently authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - users
+  /r/{code}:
+    get:
+      description: Redirects to the original URL for the given short code. Click analytics
+        are recorded asynchronously.
+      parameters:
+      - description: Short code
+        in: path
+        name: code
+        required: true
+        type: string
+      responses:
+        "302":
+          description: Found
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+      summary: Resolve short link
+      tags:
+      - redirect
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer " followed by your access token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

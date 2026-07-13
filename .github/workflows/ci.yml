@@ -32,6 +32,12 @@ jobs:
         go mod tidy
         git diff --exit-code
 
+    - name: Install swag CLI
+      run: go install github.com/swaggo/swag/cmd/swag@v1.16.4
+
+    - name: Generate Swagger documentation
+      run: swag init --generalInfo cmd/api/main.go --output docs --parseDependency --parseInternal
+
     - name: Verify code formatting (gofmt)
       run: |
         gofmt -w .

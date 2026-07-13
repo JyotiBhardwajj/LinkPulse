@@ -23,7 +23,19 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
-// Register registers a new user credentials.
+// Register registers a new user account.
+//
+// @Summary      Register a new user
+// @Description  Creates a new user account with the given email and password.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      models.UserRegisterRequest  true  "Registration payload"
+// @Success      201      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      409      {object}  models.ErrorResponse
+// @Failure      422      {object}  models.ValidationErrorResponse
+// @Router       /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req models.UserRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -41,7 +53,19 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusCreated, "User registered successfully", resp)
 }
 
-// Login checks credentials and generates token pairs.
+// Login authenticates a user and returns a JWT token pair.
+//
+// @Summary      Login
+// @Description  Validates credentials and returns an access token and refresh token.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      models.LoginRequest  true  "Login credentials"
+// @Success      200      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      401      {object}  models.ErrorResponse
+// @Failure      422      {object}  models.ValidationErrorResponse
+// @Router       /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -68,6 +92,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 // Refresh rotates the refresh token and returns a new token pair.
+//
+// @Summary      Refresh tokens
+// @Description  Accepts a valid refresh token and returns a new access token and refresh token pair.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      models.RefreshRequest  true  "Refresh token payload"
+// @Success      200      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      401      {object}  models.ErrorResponse
+// @Failure      422      {object}  models.ValidationErrorResponse
+// @Router       /api/v1/auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req models.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -89,6 +125,18 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 // Logout revokes the refresh token of the current session.
+//
+// @Summary      Logout current session
+// @Description  Revokes the provided refresh token, ending the current device session.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      models.RefreshRequest  true  "Refresh token to revoke"
+// @Success      200      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      401      {object}  models.ErrorResponse
+// @Router       /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req models.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -106,7 +154,16 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Logout successful", nil)
 }
 
-// GetSessions lists all active sessions for the current authenticated user.
+// GetSessions lists all active sessions for the authenticated user.
+//
+// @Summary      List active sessions
+// @Description  Returns all active device sessions for the currently authenticated user.
+// @Tags         auth
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.SuccessResponse
+// @Failure      401  {object}  models.ErrorResponse
+// @Router       /api/v1/auth/sessions [get]
 func (h *AuthHandler) GetSessions(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -124,7 +181,16 @@ func (h *AuthHandler) GetSessions(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Active sessions retrieved successfully", resp)
 }
 
-// LogoutAll revokes all refresh tokens for the current authenticated user.
+// LogoutAll revokes all refresh tokens for the authenticated user.
+//
+// @Summary      Logout all sessions
+// @Description  Revokes all refresh tokens, ending all device sessions for the authenticated user.
+// @Tags         auth
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.SuccessResponse
+// @Failure      401  {object}  models.ErrorResponse
+// @Router       /api/v1/auth/logout-all [post]
 func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {

@@ -41,7 +41,17 @@ func (h *UserHandler) Register(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusCreated, "User registered successfully", resp)
 }
 
-// Me retrieves details of the currently authenticated user from the request context.
+// Me retrieves the profile of the currently authenticated user.
+//
+// @Summary      Get current user profile
+// @Description  Returns the profile information of the currently authenticated user.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.SuccessResponse
+// @Failure      401  {object}  models.ErrorResponse
+// @Failure      404  {object}  models.ErrorResponse
+// @Router       /api/v1/users/me [get]
 func (h *UserHandler) Me(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {

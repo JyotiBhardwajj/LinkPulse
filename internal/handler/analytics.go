@@ -25,6 +25,15 @@ func NewAnalyticsHandler(analyticsService service.AnalyticsService) *AnalyticsHa
 }
 
 // GetOverview returns total and active system statistics for the user's links.
+//
+// @Summary      Analytics overview
+// @Description  Returns aggregate statistics for all links owned by the authenticated user.
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.SuccessResponse
+// @Failure      401  {object}  models.ErrorResponse
+// @Router       /api/v1/analytics/overview [get]
 func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -47,6 +56,19 @@ func (h *AnalyticsHandler) GetOverview(c *gin.Context) {
 }
 
 // GetClicksOverTime returns time-series click buckets.
+//
+// @Summary      Clicks over time
+// @Description  Returns time-series click data grouped by interval for the authenticated user's links.
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Param        start_date  query     string  false  "Start date (RFC3339)"
+// @Param        end_date    query     string  false  "End date (RFC3339)"
+// @Param        interval    query     string  false  "Grouping interval: hour, day, week"
+// @Success      200         {object}  models.SuccessResponse
+// @Failure      401         {object}  models.ErrorResponse
+// @Failure      422         {object}  models.ValidationErrorResponse
+// @Router       /api/v1/analytics/clicks [get]
 func (h *AnalyticsHandler) GetClicksOverTime(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -90,6 +112,16 @@ func (h *AnalyticsHandler) GetClicksOverTime(c *gin.Context) {
 }
 
 // GetTopLinks returns top links by click counts.
+//
+// @Summary      Top performing links
+// @Description  Returns the top N links ranked by click count for the authenticated user.
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Param        limit  query     int  false  "Number of results (default 10)"
+// @Success      200    {object}  models.SuccessResponse
+// @Failure      401    {object}  models.ErrorResponse
+// @Router       /api/v1/analytics/top-links [get]
 func (h *AnalyticsHandler) GetTopLinks(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -119,6 +151,17 @@ func (h *AnalyticsHandler) GetTopLinks(c *gin.Context) {
 }
 
 // GetDeviceDistribution returns clicks percentages grouped by device platforms.
+//
+// @Summary      Device distribution
+// @Description  Returns click counts grouped by device type (mobile, desktop, tablet, etc.).
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Param        start_date  query     string  false  "Start date (RFC3339)"
+// @Param        end_date    query     string  false  "End date (RFC3339)"
+// @Success      200         {object}  models.SuccessResponse
+// @Failure      401         {object}  models.ErrorResponse
+// @Router       /api/v1/analytics/devices [get]
 func (h *AnalyticsHandler) GetDeviceDistribution(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -161,6 +204,17 @@ func (h *AnalyticsHandler) GetDeviceDistribution(c *gin.Context) {
 }
 
 // GetBrowserDistribution returns clicks percentages grouped by browser agents.
+//
+// @Summary      Browser distribution
+// @Description  Returns click counts grouped by browser (Chrome, Firefox, Safari, etc.).
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Param        start_date  query     string  false  "Start date (RFC3339)"
+// @Param        end_date    query     string  false  "End date (RFC3339)"
+// @Success      200         {object}  models.SuccessResponse
+// @Failure      401         {object}  models.ErrorResponse
+// @Router       /api/v1/analytics/browsers [get]
 func (h *AnalyticsHandler) GetBrowserDistribution(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -203,6 +257,18 @@ func (h *AnalyticsHandler) GetBrowserDistribution(c *gin.Context) {
 }
 
 // GetReferrerDistribution returns top domain referrers.
+//
+// @Summary      Referrer distribution
+// @Description  Returns click counts grouped by referrer domain.
+// @Tags         analytics
+// @Produce      json
+// @Security     BearerAuth
+// @Param        start_date  query     string  false  "Start date (RFC3339)"
+// @Param        end_date    query     string  false  "End date (RFC3339)"
+// @Param        limit       query     int     false  "Max referrers to return"
+// @Success      200         {object}  models.SuccessResponse
+// @Failure      401         {object}  models.ErrorResponse
+// @Router       /api/v1/analytics/referrers [get]
 func (h *AnalyticsHandler) GetReferrerDistribution(c *gin.Context) {
 	authCtx, ok := middleware.GetAuthContext(c)
 	if !ok {
@@ -245,7 +311,20 @@ func (h *AnalyticsHandler) GetReferrerDistribution(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Referrers distribution compiled successfully", referrers)
 }
 
-// GetLinkAnalytics returns complete metrics for a single link ID (with ownership checks).
+// GetLinkAnalytics returns complete metrics for a single link.
+//
+// @Summary      Link analytics
+// @Description  Returns detailed time-series analytics for a specific link owned by the authenticated user.
+// @Tags         links
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id          path      string  true   "Link UUID"
+// @Param        start_date  query     string  false  "Start date (RFC3339)"
+// @Param        end_date    query     string  false  "End date (RFC3339)"
+// @Success      200         {object}  models.SuccessResponse
+// @Failure      401         {object}  models.ErrorResponse
+// @Failure      404         {object}  models.ErrorResponse
+// @Router       /api/v1/links/{id}/analytics [get]
 func (h *AnalyticsHandler) GetLinkAnalytics(c *gin.Context) {
 	idStr := c.Param("id")
 	linkID, err := uuid.Parse(idStr)

@@ -30,7 +30,20 @@ func NewLinkHandler(linkService service.LinkService, workerPool worker.WorkerPoo
 	}
 }
 
-// Create binds request payload and creates a shortened mapping.
+// Create creates a new shortened link.
+//
+// @Summary      Create short link
+// @Description  Shortens a long URL and returns the short link details.
+// @Tags         links
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      models.CreateLinkRequest  true  "Link creation payload"
+// @Success      201      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      401      {object}  models.ErrorResponse
+// @Failure      422      {object}  models.ValidationErrorResponse
+// @Router       /api/v1/links [post]
 func (h *LinkHandler) Create(c *gin.Context) {
 	var req models.CreateLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -54,8 +67,16 @@ func (h *LinkHandler) Create(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusCreated, "Link shortened successfully", resp)
 }
 
-// Resolve processes short code lookup and issues 302 HTTP redirection.
-// Offloads click metrics tracking asynchronously using the background worker pool.
+// Resolve resolves a short code and redirects to the original URL.
+//
+// @Summary      Resolve short link
+// @Description  Redirects to the original URL for the given short code. Click analytics are recorded asynchronously.
+// @Tags         redirect
+// @Param        code  path  string  true  "Short code"
+// @Success      302
+// @Failure      404  {object}  models.ErrorResponse
+// @Failure      410  {object}  models.ErrorResponse
+// @Router       /r/{code} [get]
 func (h *LinkHandler) Resolve(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
@@ -91,7 +112,19 @@ func (h *LinkHandler) Resolve(c *gin.Context) {
 	_ = h.workerPool.Submit(c.Request.Context(), event)
 }
 
-// Get retrieves details of a specific link owned by the user.
+// Get retrieves a specific link by ID.
+//
+// @Summary      Get link by ID
+// @Description  Returns details of a specific shortened link owned by the authenticated user.
+// @Tags         links
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Link UUID"
+// @Success      200  {object}  models.SuccessResponse
+// @Success      304  "Not Modified"
+// @Failure      401  {object}  models.ErrorResponse
+// @Failure      404  {object}  models.ErrorResponse
+// @Router       /api/v1/links/{id} [get]
 func (h *LinkHandler) Get(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -131,7 +164,23 @@ func (h *LinkHandler) Get(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Link retrieved successfully", resp)
 }
 
-// List returns all links registered by the authenticated user.
+// List returns all links owned by the authenticated user.
+//
+// @Summary      List links
+// @Description  Returns a paginated list of all shortened links created by the authenticated user.
+// @Tags         links
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page      query     int     false  "Page number (default 1)"
+// @Param        limit     query     int     false  "Items per page (default 20, max 100)"
+// @Param        search    query     string  false  "Search by URL or title"
+// @Param        sort      query     string  false  "Sort field: created_at, updated_at, expires_at"
+// @Param        order     query     string  false  "Sort order: asc, desc"
+// @Param        status    query     string  false  "Filter by status: active, expired, inactive, deleted"
+// @Success      200       {object}  models.PaginatedResponse
+// @Success      304       "Not Modified"
+// @Failure      401       {object}  models.ErrorResponse
+// @Router       /api/v1/links [get]
 func (h *LinkHandler) List(c *gin.Context) {
 	var q models.ListLinksQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
@@ -164,7 +213,22 @@ func (h *LinkHandler) List(c *gin.Context) {
 	utils.SendPaginatedSuccess(c, http.StatusOK, "Links retrieved successfully", resp, resp.Page, resp.Limit, resp.Total, resp.TotalPages)
 }
 
-// Update partial-modifies link configurations.
+// Update partially updates a link's configuration.
+//
+// @Summary      Update link
+// @Description  Updates the title, expiry date, or active status of an existing link.
+// @Tags         links
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      string                   true  "Link UUID"
+// @Param        request  body      models.UpdateLinkRequest  true  "Update payload"
+// @Success      200      {object}  models.SuccessResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      401      {object}  models.ErrorResponse
+// @Failure      404      {object}  models.ErrorResponse
+// @Failure      422      {object}  models.ValidationErrorResponse
+// @Router       /api/v1/links/{id} [patch]
 func (h *LinkHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -201,7 +265,18 @@ func (h *LinkHandler) Update(c *gin.Context) {
 	utils.SendSuccess(c, http.StatusOK, "Link updated successfully", resp)
 }
 
-// Delete soft-removes the resource mapping.
+// Delete soft-deletes a link.
+//
+// @Summary      Delete link
+// @Description  Soft-deletes a shortened link. The short code will no longer resolve.
+// @Tags         links
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path  string  true  "Link UUID"
+// @Success      204  "No Content"
+// @Failure      401  {object}  models.ErrorResponse
+// @Failure      404  {object}  models.ErrorResponse
+// @Router       /api/v1/links/{id} [delete]
 func (h *LinkHandler) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -232,7 +307,18 @@ func (h *LinkHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// GetStats returns click analytics counts for a specific shortened link.
+// GetStats returns click statistics for a specific link.
+//
+// @Summary      Get link statistics
+// @Description  Returns total click count and basic metrics for a specific shortened link.
+// @Tags         links
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Link UUID"
+// @Success      200  {object}  models.SuccessResponse
+// @Failure      401  {object}  models.ErrorResponse
+// @Failure      404  {object}  models.ErrorResponse
+// @Router       /api/v1/links/{id}/stats [get]
 func (h *LinkHandler) GetStats(c *gin.Context) {
 	code := c.Param("code")
 	if code == "" {
