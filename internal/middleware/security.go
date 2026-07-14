@@ -1,13 +1,23 @@
 // Package middleware defines Gin HTTP middlewares.
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
 
 // SecurityHeaders injects production security headers into every HTTP response.
 // These headers prevent common web vulnerabilities such as MIME sniffing,
 // clickjacking, and unwanted cross-origin resource sharing.
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip strict security headers for Swagger UI endpoints to allow rendering HTML/JS/CSS.
+		if strings.HasPrefix(c.Request.URL.Path, "/swagger") {
+			c.Next()
+			return
+		}
+
 		// Prevents MIME type sniffing in browsers.
 		c.Header("X-Content-Type-Options", "nosniff")
 

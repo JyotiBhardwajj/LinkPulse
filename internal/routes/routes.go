@@ -79,9 +79,6 @@ func SetupRouter(
 	// Redirect Endpoint (Optimized path)
 	mainGroup.GET("/r/:code", linkHandler.Resolve)
 
-	// Static Swagger spec file
-	mainGroup.StaticFile("/docs/swagger.json", "./docs/swagger.json")
-
 	// Instantiate authorization middleware wrapper
 	authMiddleware := middleware.Auth(jwtSecret, jwtIssuer)
 
@@ -94,7 +91,7 @@ func SetupRouter(
 	registerV2Routes(v2)
 
 	// Swagger UI — served at /swagger/index.html
-	mainGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return r
 }

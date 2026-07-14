@@ -55,13 +55,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -106,19 +106,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -157,13 +157,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -188,13 +188,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -239,13 +239,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -278,13 +278,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -310,7 +310,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.LoginRequest"
+                            "$ref": "#/definitions/models.LoginRequest"
                         }
                     }
                 ],
@@ -318,25 +318,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -367,7 +367,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.RefreshRequest"
+                            "$ref": "#/definitions/models.RefreshRequest"
                         }
                     }
                 ],
@@ -375,19 +375,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -412,13 +412,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -444,7 +444,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.RefreshRequest"
+                            "$ref": "#/definitions/models.RefreshRequest"
                         }
                     }
                 ],
@@ -452,25 +452,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -496,7 +496,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.UserRegisterRequest"
+                            "$ref": "#/definitions/models.UserRegisterRequest"
                         }
                     }
                 ],
@@ -504,25 +504,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -547,13 +547,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -616,7 +616,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.PaginatedResponse"
+                            "$ref": "#/definitions/models.PaginatedResponse"
                         }
                     },
                     "304": {
@@ -625,7 +625,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -654,7 +654,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.CreateLinkRequest"
+                            "$ref": "#/definitions/models.CreateLinkRequest"
                         }
                     }
                 ],
@@ -662,25 +662,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -714,7 +714,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "304": {
@@ -723,13 +723,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -764,13 +764,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -806,7 +806,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.UpdateLinkRequest"
+                            "$ref": "#/definitions/models.UpdateLinkRequest"
                         }
                     }
                 ],
@@ -814,31 +814,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ValidationErrorResponse"
+                            "$ref": "#/definitions/models.ValidationErrorResponse"
                         }
                     }
                 }
@@ -884,19 +884,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -930,19 +930,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -967,19 +967,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.SuccessResponse"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -1008,13 +1008,13 @@ const docTemplate = `{
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "410": {
                         "description": "Gone",
                         "schema": {
-                            "$ref": "#/definitions/linkpulse_internal_models.ErrorResponse"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -1022,7 +1022,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "linkpulse_internal_models.CreateLinkRequest": {
+        "models.CreateLinkRequest": {
             "type": "object",
             "required": [
                 "original_url"
@@ -1045,7 +1045,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.ErrorDetails": {
+        "models.ErrorDetails": {
             "type": "object",
             "properties": {
                 "code": {
@@ -1058,7 +1058,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.ErrorResponse": {
+        "models.ErrorResponse": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -1066,7 +1066,7 @@ const docTemplate = `{
                     "example": "The email or password provided is incorrect."
                 },
                 "error": {
-                    "$ref": "#/definitions/linkpulse_internal_models.ErrorDetails"
+                    "$ref": "#/definitions/models.ErrorDetails"
                 },
                 "instance": {
                     "type": "string",
@@ -1094,7 +1094,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.LoginRequest": {
+        "models.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1109,7 +1109,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.PaginatedResponse": {
+        "models.PaginatedResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -1118,7 +1118,7 @@ const docTemplate = `{
                     "example": "Items retrieved successfully"
                 },
                 "metadata": {
-                    "$ref": "#/definitions/linkpulse_internal_models.PaginationMetadata"
+                    "$ref": "#/definitions/models.PaginationMetadata"
                 },
                 "request_id": {
                     "type": "string",
@@ -1130,7 +1130,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.PaginationMetadata": {
+        "models.PaginationMetadata": {
             "type": "object",
             "properties": {
                 "has_next": {
@@ -1159,7 +1159,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.RefreshRequest": {
+        "models.RefreshRequest": {
             "type": "object",
             "required": [
                 "refresh_token"
@@ -1170,7 +1170,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.SuccessResponse": {
+        "models.SuccessResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -1188,7 +1188,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.UpdateLinkRequest": {
+        "models.UpdateLinkRequest": {
             "type": "object",
             "properties": {
                 "expires_at": {
@@ -1203,7 +1203,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.UserRegisterRequest": {
+        "models.UserRegisterRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1220,7 +1220,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.ValidationError": {
+        "models.ValidationError": {
             "type": "object",
             "properties": {
                 "field": {
@@ -1237,7 +1237,7 @@ const docTemplate = `{
                 }
             }
         },
-        "linkpulse_internal_models.ValidationErrorResponse": {
+        "models.ValidationErrorResponse": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -1247,11 +1247,11 @@ const docTemplate = `{
                 "details": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/linkpulse_internal_models.ValidationError"
+                        "$ref": "#/definitions/models.ValidationError"
                     }
                 },
                 "error": {
-                    "$ref": "#/definitions/linkpulse_internal_models.ErrorDetails"
+                    "$ref": "#/definitions/models.ErrorDetails"
                 },
                 "instance": {
                     "type": "string",

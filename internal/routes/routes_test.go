@@ -4,8 +4,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -19,14 +17,6 @@ import (
 
 func TestRouterConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	// Create a temporary ./docs directory relative to test execution context
-	err := os.MkdirAll("docs", 0755)
-	assert.NoError(t, err)
-	defer os.RemoveAll("docs")
-
-	err = os.WriteFile(filepath.Join("docs", "swagger.json"), []byte(`{"openapi": "3.0.3"}`), 0644)
-	assert.NoError(t, err)
 
 	m := metrics.NewNoOpMetrics()
 	rs := health.NewReadinessState(m)
@@ -83,14 +73,23 @@ func TestRouterConfiguration(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
-	t.Run("GET /docs/swagger.json - success", func(t *testing.T) {
+	t.Run("GET /swagger/index.html - success", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/docs/swagger.json", nil)
+		req, _ := http.NewRequest("GET", "/swagger/index.html", nil)
+		req.RequestURI = "/swagger/index.html"
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("GET /swagger/doc.json - success", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/swagger/doc.json", nil)
+		req.RequestURI = "/swagger/doc.json"
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		body, err := io.ReadAll(w.Body)
 		assert.NoError(t, err)
-		assert.Contains(t, string(body), "openapi")
+		assert.Contains(t, string(body), "swagger")
 	})
 }

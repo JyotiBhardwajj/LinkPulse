@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  linkpulse_internal_models.CreateLinkRequest:
+  models.CreateLinkRequest:
     properties:
       custom_alias:
         maxLength: 50
@@ -16,7 +16,7 @@ definitions:
     required:
     - original_url
     type: object
-  linkpulse_internal_models.ErrorDetails:
+  models.ErrorDetails:
     properties:
       code:
         example: INVALID_CREDENTIALS
@@ -25,13 +25,13 @@ definitions:
         example: Invalid email or password
         type: string
     type: object
-  linkpulse_internal_models.ErrorResponse:
+  models.ErrorResponse:
     properties:
       detail:
         example: The email or password provided is incorrect.
         type: string
       error:
-        $ref: '#/definitions/linkpulse_internal_models.ErrorDetails'
+        $ref: '#/definitions/models.ErrorDetails'
       instance:
         example: /api/v1/auth/login
         type: string
@@ -51,7 +51,7 @@ definitions:
         example: https://linkpulse.com/errors/invalid-credentials
         type: string
     type: object
-  linkpulse_internal_models.LoginRequest:
+  models.LoginRequest:
     properties:
       email:
         type: string
@@ -61,14 +61,14 @@ definitions:
     - email
     - password
     type: object
-  linkpulse_internal_models.PaginatedResponse:
+  models.PaginatedResponse:
     properties:
       data: {}
       message:
         example: Items retrieved successfully
         type: string
       metadata:
-        $ref: '#/definitions/linkpulse_internal_models.PaginationMetadata'
+        $ref: '#/definitions/models.PaginationMetadata'
       request_id:
         example: uuid-request-id
         type: string
@@ -76,7 +76,7 @@ definitions:
         example: true
         type: boolean
     type: object
-  linkpulse_internal_models.PaginationMetadata:
+  models.PaginationMetadata:
     properties:
       has_next:
         example: true
@@ -97,14 +97,14 @@ definitions:
         example: 5
         type: integer
     type: object
-  linkpulse_internal_models.RefreshRequest:
+  models.RefreshRequest:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
     type: object
-  linkpulse_internal_models.SuccessResponse:
+  models.SuccessResponse:
     properties:
       data: {}
       message:
@@ -117,7 +117,7 @@ definitions:
         example: true
         type: boolean
     type: object
-  linkpulse_internal_models.UpdateLinkRequest:
+  models.UpdateLinkRequest:
     properties:
       expires_at:
         type: string
@@ -127,7 +127,7 @@ definitions:
         maxLength: 255
         type: string
     type: object
-  linkpulse_internal_models.UserRegisterRequest:
+  models.UserRegisterRequest:
     properties:
       email:
         type: string
@@ -139,7 +139,7 @@ definitions:
     - email
     - password
     type: object
-  linkpulse_internal_models.ValidationError:
+  models.ValidationError:
     properties:
       field:
         example: email
@@ -151,17 +151,17 @@ definitions:
         example: required
         type: string
     type: object
-  linkpulse_internal_models.ValidationErrorResponse:
+  models.ValidationErrorResponse:
     properties:
       detail:
         example: Validation failed
         type: string
       details:
         items:
-          $ref: '#/definitions/linkpulse_internal_models.ValidationError'
+          $ref: '#/definitions/models.ValidationError'
         type: array
       error:
-        $ref: '#/definitions/linkpulse_internal_models.ErrorDetails'
+        $ref: '#/definitions/models.ErrorDetails'
       instance:
         example: /api/v1/links
         type: string
@@ -217,11 +217,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Browser distribution
@@ -250,15 +250,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       security:
       - BearerAuth: []
       summary: Clicks over time
@@ -283,11 +283,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Device distribution
@@ -303,11 +303,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Analytics overview
@@ -335,11 +335,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Referrer distribution
@@ -360,11 +360,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Top performing links
@@ -381,26 +381,26 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.LoginRequest'
+          $ref: '#/definitions/models.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       summary: Login
       tags:
       - auth
@@ -415,22 +415,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.RefreshRequest'
+          $ref: '#/definitions/models.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Logout current session
@@ -446,11 +446,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Logout all sessions
@@ -468,26 +468,26 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.RefreshRequest'
+          $ref: '#/definitions/models.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       summary: Refresh tokens
       tags:
       - auth
@@ -502,26 +502,26 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.UserRegisterRequest'
+          $ref: '#/definitions/models.UserRegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       summary: Register a new user
       tags:
       - auth
@@ -535,11 +535,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List active sessions
@@ -580,13 +580,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.PaginatedResponse'
+            $ref: '#/definitions/models.PaginatedResponse'
         "304":
           description: Not Modified
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List links
@@ -602,26 +602,26 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.CreateLinkRequest'
+          $ref: '#/definitions/models.CreateLinkRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       security:
       - BearerAuth: []
       summary: Create short link
@@ -644,11 +644,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete link
@@ -669,17 +669,17 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "304":
           description: Not Modified
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get link by ID
@@ -701,30 +701,30 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/linkpulse_internal_models.UpdateLinkRequest'
+          $ref: '#/definitions/models.UpdateLinkRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ValidationErrorResponse'
+            $ref: '#/definitions/models.ValidationErrorResponse'
       security:
       - BearerAuth: []
       summary: Update link
@@ -754,15 +754,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Link analytics
@@ -784,15 +784,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get link statistics
@@ -808,15 +808,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.SuccessResponse'
+            $ref: '#/definitions/models.SuccessResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get current user profile
@@ -838,11 +838,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
         "410":
           description: Gone
           schema:
-            $ref: '#/definitions/linkpulse_internal_models.ErrorResponse'
+            $ref: '#/definitions/models.ErrorResponse'
       summary: Resolve short link
       tags:
       - redirect
