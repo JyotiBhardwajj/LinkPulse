@@ -48,7 +48,7 @@ type prometheusMetrics struct {
 	// DB metrics
 	dbQueryDur *prometheus.HistogramVec
 
-	// Day 10 health metrics
+	// Health and probe metrics
 	healthCheckDur prometheus.Histogram
 	readinessState prometheus.Gauge
 	startupDur     prometheus.Gauge

@@ -42,3 +42,13 @@ Desktop.ini
 # Logs
 logs/
 *.log
+
+# Load testing artifacts & execution outputs
+loadtest/report.html
+loadtest/summary.json
+*.json.tmp
+*-results.json
+baseline.json
+stress.json
+spike.json
+soak.json

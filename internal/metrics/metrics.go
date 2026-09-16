@@ -27,7 +27,7 @@ type Metrics interface {
 	RecordAnalyticsWrite()
 	RecordAnalyticsError()
 
-	// Day 10 extensions
+	// Health and lifecycle metrics
 	RecordHealthCheckDuration(duration time.Duration)
 	RecordReadinessState(ready bool)
 	RecordStartupDuration(duration time.Duration)

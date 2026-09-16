@@ -30,7 +30,7 @@ type AuthService interface {
 	LogoutAllDevices(ctx context.Context, userID uuid.UUID) error
 	GetCurrentUser(ctx context.Context, userID uuid.UUID) (*models.UserProfileResponse, error)
 
-	// Day 7 additions
+	// Session and role management
 	GetSessions(ctx context.Context, userID uuid.UUID, currentTokenID uuid.UUID) ([]models.SessionResponse, error)
 	LogoutAll(ctx context.Context, userID uuid.UUID) error
 	PromoteUser(ctx context.Context, targetUserID uuid.UUID) error

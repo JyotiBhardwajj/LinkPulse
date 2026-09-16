@@ -33,7 +33,7 @@ func NewSyncEventDispatcher() EventDispatcher {
 	return &syncEventDispatcher{}
 }
 
-// Dispatch executes a no-op dispatch (for Day 1 integration bounds).
+// Dispatch executes a no-op dispatch.
 func (d *syncEventDispatcher) Dispatch(ctx context.Context, eventType EventType, payload interface{}) error {
 	// Real implementation would serialize and publish to Redis Streams / RabbitMQ / Kafka.
 	return nil

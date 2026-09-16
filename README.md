@@ -177,7 +177,7 @@ LinkPulse supports route versioning under `/api/v1` to decouple evolving routes 
 ### Run Local Stack
 1. Clone the repository and navigate to the project directory:
    ```bash
-   cd LinkForge
+   cd LinkPulse
    ```
 2. Build and start backing containers (Postgres, Redis, Prometheus, Grafana) along with the API engine:
    ```bash

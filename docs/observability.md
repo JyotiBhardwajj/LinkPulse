@@ -80,5 +80,5 @@ This boots up:
 1. PostgreSQL Database (`linkpulse-db` on port `5432`)
 2. Redis Cache (`linkpulse-redis` on port `6379`)
 3. LinkPulse HTTP API (`linkpulse-api` on port `8080`)
-4. Prometheus Scraper (`linkpulse-prometheus` on port `9090` using configuration [deploy/prometheus.yml](file:///c:/Users/jyoti/Desktop/LinkForge/deploy/prometheus.yml))
-5. Grafana Dashboard (`linkpulse-grafana` on port `3000` provisioned with dashboard schema [deploy/grafana-dashboard.json](file:///c:/Users/jyoti/Desktop/LinkForge/deploy/grafana-dashboard.json))
+4. Prometheus Scraper (`linkpulse-prometheus` on port `9090` using configuration [deploy/prometheus.yml](../deploy/prometheus.yml))
+5. Grafana Dashboard (`linkpulse-grafana` on port `3000` provisioned with dashboard schema [deploy/grafana-dashboard.json](../deploy/grafana-dashboard.json))

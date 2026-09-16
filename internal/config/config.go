@@ -212,7 +212,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("METRICS_NAMESPACE", "linkpulse")
 	viper.SetDefault("METRICS_SUBSYSTEM", "api")
 
-	// Day 10 Lifecycle defaults
+	// Lifecycle defaults
 	viper.SetDefault("HEALTH_TIMEOUT", "5s")
 	viper.SetDefault("STARTUP_TIMEOUT", "30s")
 	viper.SetDefault("SHUTDOWN_TIMEOUT", "30s")
